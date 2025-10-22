@@ -1,0 +1,59 @@
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.25
+alembic==1.13.1
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# Vector Database
+pgvector==0.2.4
+
+# Redis & Background Jobs
+redis==5.0.1
+celery[redis]==5.3.6
+
+# AI & Agent Framework
+pydantic-ai-slim[openai]==1.0.5  # Agent framework with OpenAI-compatible API support
+anthropic==0.42.0  # For OpenRouter compatibility (upgraded for httpx compatibility)
+openai==1.99.9     # OpenAI SDK (required by pydantic-ai >=1.99.9) + optional embeddings
+
+# Email (IMAP/SMTP)
+python-dotenv==1.0.1
+
+# Data Validation
+pydantic==2.10.6  # Required by pydantic-ai (>=2.10)
+pydantic-settings==2.1.0
+email-validator==2.1.0.post1
+
+# Document Processing for RAG
+PyPDF2==3.0.1
+python-docx==1.1.0
+markdown==3.5.2
+
+# Text Processing
+tiktoken==0.5.2
+
+# HTTP Client
+httpx==0.28.1  # Required by genai-prices (pydantic-ai dependency)
+aiohttp==3.9.1
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2024.1
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+
+# Code Quality
+black==24.1.1
+ruff==0.1.14
+mypy==1.8.0
+
+# Logging
+structlog==24.1.0

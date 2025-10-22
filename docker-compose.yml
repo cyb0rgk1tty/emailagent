@@ -1,0 +1,213 @@
+name: emailagent
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: emailagent_postgres
+    restart: unless-stopped
+    ports:
+      - "5434:5432"  # External port 5434 to avoid conflicts
+    environment:
+      POSTGRES_DB: ${DB_NAME:-supplement_leads_db}
+      POSTGRES_USER: ${DB_USER:-emailagent_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeMe123!}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - emailagent_postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - emailagent_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-emailagent_user} -d ${DB_NAME:-supplement_leads_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: emailagent_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"  # External port 6380 to avoid conflicts
+    volumes:
+      - emailagent_redis_data:/data
+    networks:
+      - emailagent_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: emailagent_backend
+    restart: unless-stopped
+    ports:
+      - "8001:8000"  # External port 8001 to avoid conflicts
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://${DB_USER:-emailagent_user}:${DB_PASSWORD:-changeMe123!}@postgres:5432/${DB_NAME:-supplement_leads_db}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      EMAIL_ADDRESS: ${EMAIL_ADDRESS}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_IMAP_HOST: ${EMAIL_IMAP_HOST}
+      EMAIL_IMAP_PORT: ${EMAIL_IMAP_PORT:-993}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      # OpenRouter / AI Configuration
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-sonnet-4.5}
+      OPENROUTER_EXTRACTION_MODEL: ${OPENROUTER_EXTRACTION_MODEL:-anthropic/claude-haiku-4.5}
+      OPENROUTER_RESPONSE_MODEL: ${OPENROUTER_RESPONSE_MODEL:-anthropic/claude-sonnet-4.5}
+      LLM_TEMPERATURE_EXTRACTION: ${LLM_TEMPERATURE_EXTRACTION:-0.3}
+      LLM_TEMPERATURE_RESPONSE: ${LLM_TEMPERATURE_RESPONSE:-0.7}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4000}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-60}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./knowledge:/app/knowledge:ro
+      - ./logs:/app/logs
+    networks:
+      - emailagent_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: emailagent_celery_worker
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://${DB_USER:-emailagent_user}:${DB_PASSWORD:-changeMe123!}@postgres:5432/${DB_NAME:-supplement_leads_db}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      EMAIL_ADDRESS: ${EMAIL_ADDRESS}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_IMAP_HOST: ${EMAIL_IMAP_HOST}
+      EMAIL_IMAP_PORT: ${EMAIL_IMAP_PORT:-993}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      # OpenRouter / AI Configuration
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-sonnet-4.5}
+      OPENROUTER_EXTRACTION_MODEL: ${OPENROUTER_EXTRACTION_MODEL:-anthropic/claude-haiku-4.5}
+      OPENROUTER_RESPONSE_MODEL: ${OPENROUTER_RESPONSE_MODEL:-anthropic/claude-sonnet-4.5}
+      LLM_TEMPERATURE_EXTRACTION: ${LLM_TEMPERATURE_EXTRACTION:-0.3}
+      LLM_TEMPERATURE_RESPONSE: ${LLM_TEMPERATURE_RESPONSE:-0.7}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4000}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-60}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./knowledge:/app/knowledge:ro
+      - ./logs:/app/logs
+    networks:
+      - emailagent_network
+    command: celery -A tasks.celery_app worker --loglevel=info --concurrency=2
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: emailagent_celery_beat
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DATABASE_URL: postgresql://${DB_USER:-emailagent_user}:${DB_PASSWORD:-changeMe123!}@postgres:5432/${DB_NAME:-supplement_leads_db}
+      EMAIL_ADDRESS: ${EMAIL_ADDRESS}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_IMAP_HOST: ${EMAIL_IMAP_HOST}
+      EMAIL_IMAP_PORT: ${EMAIL_IMAP_PORT:-993}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      # OpenRouter / AI Configuration
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-sonnet-4.5}
+      OPENROUTER_EXTRACTION_MODEL: ${OPENROUTER_EXTRACTION_MODEL:-anthropic/claude-haiku-4.5}
+      OPENROUTER_RESPONSE_MODEL: ${OPENROUTER_RESPONSE_MODEL:-anthropic/claude-sonnet-4.5}
+      LLM_TEMPERATURE_EXTRACTION: ${LLM_TEMPERATURE_EXTRACTION:-0.3}
+      LLM_TEMPERATURE_RESPONSE: ${LLM_TEMPERATURE_RESPONSE:-0.7}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4000}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-60}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    networks:
+      - emailagent_network
+    command: celery -A tasks.celery_app beat --loglevel=info
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: emailagent_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # External port 3001 to avoid conflicts
+    environment:
+      VITE_API_URL: http://localhost:8001
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Anonymous volume for node_modules
+    networks:
+      - emailagent_network
+    stdin_open: true
+    tty: true
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: emailagent_pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@nutricraftlabs.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - emailagent_pgadmin_data:/var/lib/pgadmin
+    networks:
+      - emailagent_network
+    profiles:
+      - tools  # Only start with: docker-compose --profile tools up
+
+networks:
+  emailagent_network:
+    driver: bridge
+    name: emailagent_network
+
+volumes:
+  emailagent_postgres_data:
+    name: emailagent_postgres_data
+  emailagent_redis_data:
+    name: emailagent_redis_data
+  emailagent_pgadmin_data:
+    name: emailagent_pgadmin_data

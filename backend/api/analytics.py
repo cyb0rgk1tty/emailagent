@@ -1,0 +1,134 @@
+"""
+Analytics API endpoints
+"""
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from typing import Optional
+from datetime import datetime, timedelta
+
+from database import get_db
+from models.database import Lead, Draft, ProductTypeTrend
+from models.schemas import AnalyticsOverview, ProductTypeTrendResponse
+
+router = APIRouter()
+
+
+@router.get("/overview", response_model=AnalyticsOverview)
+async def get_analytics_overview(
+    days: int = Query(7, ge=1, le=90),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get analytics overview"""
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    # Total leads
+    total_leads_result = await db.execute(
+        select(func.count(Lead.id)).where(Lead.received_at >= cutoff_date)
+    )
+    total_leads = total_leads_result.scalar() or 0
+
+    # Total drafts
+    total_drafts_result = await db.execute(select(func.count(Draft.id)))
+    total_drafts = total_drafts_result.scalar() or 0
+
+    # Pending drafts
+    pending_drafts_result = await db.execute(
+        select(func.count(Draft.id)).where(Draft.status == 'pending')
+    )
+    pending_drafts = pending_drafts_result.scalar() or 0
+
+    # Average quality score
+    avg_score_result = await db.execute(
+        select(func.avg(Lead.lead_quality_score))
+        .where(Lead.received_at >= cutoff_date)
+        .where(Lead.lead_quality_score.isnot(None))
+    )
+    avg_quality_score = avg_score_result.scalar() or 0.0
+
+    # Approval rate
+    approved_result = await db.execute(
+        select(func.count(Draft.id)).where(Draft.status.in_(['approved', 'sent']))
+    )
+    approved = approved_result.scalar() or 0
+    approval_rate = (approved / total_drafts * 100) if total_drafts > 0 else 0.0
+
+    # Leads by priority
+    priority_result = await db.execute(
+        select(Lead.response_priority, func.count(Lead.id))
+        .where(Lead.received_at >= cutoff_date)
+        .where(Lead.response_priority.isnot(None))
+        .group_by(Lead.response_priority)
+    )
+    leads_by_priority = {row[0]: row[1] for row in priority_result.all()}
+
+    # Leads by product type (simplified - just count first product type)
+    product_result = await db.execute(
+        select(Lead.product_type, func.count(Lead.id))
+        .where(Lead.received_at >= cutoff_date)
+        .where(Lead.product_type.isnot(None))
+        .group_by(Lead.product_type)
+    )
+    # This is simplified - would need more complex logic for array types
+    leads_by_product_type = {}
+
+    # Recent activity (last 10 items)
+    recent_leads = await db.execute(
+        select(Lead)
+        .where(Lead.received_at >= cutoff_date)
+        .order_by(Lead.received_at.desc())
+        .limit(10)
+    )
+    recent_activity = [
+        {
+            "type": "lead",
+            "id": lead.id,
+            "email": lead.sender_email,
+            "score": lead.lead_quality_score,
+            "timestamp": lead.received_at.isoformat()
+        }
+        for lead in recent_leads.scalars().all()
+    ]
+
+    return AnalyticsOverview(
+        total_leads=total_leads,
+        total_drafts=total_drafts,
+        pending_drafts=pending_drafts,
+        avg_quality_score=round(float(avg_quality_score), 2),
+        approval_rate=round(approval_rate, 2),
+        leads_by_priority=leads_by_priority,
+        leads_by_product_type=leads_by_product_type,
+        recent_activity=recent_activity
+    )
+
+
+@router.get("/product-trends")
+async def get_product_trends(
+    days: int = Query(30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get product type trends"""
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    result = await db.execute(
+        select(ProductTypeTrend)
+        .where(ProductTypeTrend.date >= cutoff_date)
+        .order_by(ProductTypeTrend.date.desc())
+    )
+    trends = result.scalars().all()
+
+    return {"trends": [ProductTypeTrendResponse.model_validate(t) for t in trends]}
+
+
+@router.get("/export/{format}")
+async def export_analytics(
+    format: str,
+    days: int = Query(30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db)
+):
+    """Export analytics data (CSV or PDF)"""
+    # Placeholder - will implement actual export in Phase 5
+    return {
+        "message": f"Export to {format} will be implemented in Phase 5",
+        "days": days
+    }
