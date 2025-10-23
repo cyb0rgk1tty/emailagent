@@ -37,7 +37,10 @@ export default function Analytics() {
 
   const analytics = overview?.data || {}
   const productTrends = trends?.data?.trends || []
-  const leads = allLeads?.data || []
+  const allLeadsData = allLeads?.data || []
+
+  // Filter out spam leads from frontend calculations
+  const leads = allLeadsData.filter(lead => lead.lead_status !== 'spam')
 
   // Calculate priority distribution
   const priorityData = [
@@ -103,17 +106,27 @@ export default function Analytics() {
             <option value={14}>Last 14 days</option>
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
+            <option value={365}>Last year</option>
+            <option value={3650}>All time</option>
           </select>
         </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <MetricCard
           title="Total Leads"
           value={analytics.total_leads || 0}
           icon={<Users className="w-6 h-6" />}
           color="blue"
+          subtitle="legitimate"
+        />
+        <MetricCard
+          title="Spam Filtered"
+          value={analytics.spam_leads || 0}
+          icon={<AlertTriangle className="w-6 h-6" />}
+          color="red"
+          subtitle="blocked"
         />
         <MetricCard
           title="Avg Quality Score"
@@ -261,6 +274,7 @@ function MetricCard({ title, value, subtitle, icon, color = 'blue' }) {
     green: 'from-green-500 to-green-600',
     purple: 'from-purple-500 to-purple-600',
     orange: 'from-orange-500 to-orange-600',
+    red: 'from-red-500 to-red-600',
   }
 
   return (
@@ -268,10 +282,10 @@ function MetricCard({ title, value, subtitle, icon, color = 'blue' }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-white text-opacity-80 text-sm font-medium">{title}</p>
-          <p className="text-3xl font-bold mt-2">
-            {value}
-            {subtitle && <span className="text-lg ml-1">{subtitle}</span>}
-          </p>
+          <div className="mt-2">
+            <span className="text-3xl font-bold">{value}</span>
+            {subtitle && <span className="text-sm ml-2 text-white text-opacity-80">{subtitle}</span>}
+          </div>
         </div>
         <div className="bg-white bg-opacity-20 rounded-full p-3">
           {icon}

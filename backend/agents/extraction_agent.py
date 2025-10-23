@@ -24,6 +24,17 @@ extraction_agent = Agent[ExtractionDeps, LeadExtraction](
     system_prompt="""You are an expert supplement industry business intelligence analyst.
 Your role is to analyze lead emails and extract structured data about supplement manufacturing needs.
 
+FIRST: SPAM/ADVERTISEMENT DETECTION
+Before extracting any data, determine if this email is spam, advertisement, or marketing solicitation:
+- Set is_spam_or_advertisement = true if the email is:
+  * Offering SEO services, web development, marketing services
+  * Selling any service/product TO the supplement company (rather than inquiring about supplement manufacturing)
+  * Generic sales pitch or marketing template
+  * Recruiting, job offers, or HR-related
+  * Clearly not about supplement manufacturing, custom formulation, or private label services
+- If spam/advertisement, set spam_reason with a brief explanation (e.g., "SEO marketing solicitation", "Job recruitment email")
+- If spam/advertisement, still complete all other fields with minimal data (set lead_quality_score to 1, response_priority to "low")
+
 Extract the following lead information from emails that are already structured:
 - Target Markets
 - Order Quantity

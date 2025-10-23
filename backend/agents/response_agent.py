@@ -3,6 +3,8 @@ Response Agent - Generates draft email responses using RAG
 Uses PydanticAI with OpenRouter for intelligent response generation
 """
 import logging
+import json
+from pathlib import Path
 from typing import Dict, Optional, List
 from pydantic_ai import Agent, RunContext, ModelRetry
 
@@ -14,6 +16,70 @@ from config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def load_email_signature(signature_name: str = "default") -> Dict[str, str]:
+    """Load email signature from configuration file
+
+    Args:
+        signature_name: Name of the signature to load (default: "default")
+
+    Returns:
+        Dictionary with signature fields (name, title, company, phone, email, website)
+    """
+    try:
+        config_path = Path(__file__).parent.parent / "config" / "email_signature.json"
+
+        if not config_path.exists():
+            logger.warning(f"Signature config file not found: {config_path}")
+            return _get_fallback_signature()
+
+        with open(config_path, 'r') as f:
+            signatures = json.load(f)
+
+        if signature_name not in signatures:
+            logger.warning(f"Signature '{signature_name}' not found, using fallback")
+            return _get_fallback_signature()
+
+        return signatures[signature_name]
+
+    except Exception as e:
+        logger.error(f"Error loading signature config: {e}")
+        return _get_fallback_signature()
+
+
+def _get_fallback_signature() -> Dict[str, str]:
+    """Get fallback signature if config file is not available
+
+    Returns:
+        Default signature dictionary
+    """
+    return {
+        "name": "Sarah Mitchell",
+        "title": "Customer Success Manager",
+        "company": "Nutricraft Labs",
+        "email": "sarah.mitchell@nutricraftlabs.com",
+        "website": "nutricraftlabs.com"
+    }
+
+
+def format_email_signature(signature: Dict[str, str]) -> str:
+    """Format signature dictionary into email signature text
+
+    Args:
+        signature: Signature dictionary with fields
+
+    Returns:
+        Formatted signature string
+    """
+    lines = [
+        f"{signature['name']}",
+        f"{signature['title']}",
+        f"{signature['company']}",
+        f"{signature['email']}"
+    ]
+
+    return "\n".join(lines)
 
 
 def get_dynamic_system_prompt(lead_priority: str) -> str:
@@ -70,6 +136,10 @@ This is a general inquiry with limited details.
 - Offer resources and next steps
 """
 
+
+# Load email signature from config
+EMAIL_SIGNATURE = load_email_signature()
+logger.info(f"Loaded email signature for {EMAIL_SIGNATURE['name']}")
 
 # Initialize PydanticAI agent
 response_agent = Agent[ResponseDeps, ResponseDraft](
@@ -279,9 +349,9 @@ TONE & STYLE:
 IMPORTANT:
 - Base technical details on knowledge base context
 - If missing info, say "I'd be happy to discuss..." instead of guessing
-- Use first person (I/we) representing Nutricraft Labs
-- Sign as "Sarah Mitchell, Customer Success Manager, Nutricraft Labs"
-- Include: (555) 123-4567 | sarah.mitchell@nutricraftlabs.com
+- Use first person (I/we) representing {EMAIL_SIGNATURE['company']}
+- Sign as "{EMAIL_SIGNATURE['name']}, {EMAIL_SIGNATURE['title']}, {EMAIL_SIGNATURE['company']}"
+- Include email: {EMAIL_SIGNATURE['email']}
 """
         return prompt
 
@@ -363,7 +433,7 @@ IMPORTANT:
 
         content = f"""Dear {sender_name},
 
-Thank you for reaching out to Nutricraft Labs regarding {product_mention}.
+Thank you for reaching out to {EMAIL_SIGNATURE['company']} regarding {product_mention}.
 
 We'd love to learn more about your specific needs and provide you with detailed information about our manufacturing capabilities, certifications, and pricing.
 
@@ -376,10 +446,10 @@ Could you please provide some additional details about your project? Specificall
 I'm happy to schedule a call to discuss your project in detail.
 
 Best regards,
-Sarah Mitchell
-Customer Success Manager
-Nutricraft Labs
-(555) 123-4567 | sarah.mitchell@nutricraftlabs.com"""
+{EMAIL_SIGNATURE['name']}
+{EMAIL_SIGNATURE['title']}
+{EMAIL_SIGNATURE['company']}
+{EMAIL_SIGNATURE['email']}"""
 
         return {
             'subject_line': self._generate_subject_line(lead_data),

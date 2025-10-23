@@ -270,6 +270,32 @@ def process_email(email_data: Dict):
 
         logger.info(f"Saved lead {lead_id} and conversation {conversation_id}")
 
+        # Check if email is spam/advertisement - skip draft generation if so
+        if extracted_data.get('is_spam_or_advertisement', False):
+            spam_reason = extracted_data.get('spam_reason', 'No reason provided')
+            logger.info(f"Email classified as spam/advertisement: {spam_reason}")
+
+            # Update lead status to spam
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(Lead).where(Lead.id == lead_id)
+                )
+                lead = result.scalar_one()
+                lead.lead_status = 'spam'
+                lead.internal_notes = f"Spam/Advertisement: {spam_reason}"
+                await session.commit()
+
+            logger.info(f"✅ Processed spam/advertisement email {message_id} - no draft generated")
+
+            return {
+                'status': 'success',
+                'classification': 'spam',
+                'message_id': message_id,
+                'lead_id': lead_id,
+                'conversation_id': conversation_id,
+                'spam_reason': spam_reason,
+            }
+
         # Step 3: Generate response
         response_agent = get_response_agent()
         draft_data = await response_agent.generate_response(extracted_data)

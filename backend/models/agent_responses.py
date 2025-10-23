@@ -79,6 +79,16 @@ class LeadExtraction(BaseModel):
         description="Confidence in extraction accuracy (0-1)"
     )
 
+    # Spam/Advertisement Detection
+    is_spam_or_advertisement: bool = Field(
+        default=False,
+        description="True if email is spam, advertisement, marketing solicitation, or not a genuine supplement manufacturing inquiry"
+    )
+    spam_reason: Optional[str] = Field(
+        default=None,
+        description="Reason why email was classified as spam/advertisement (if applicable)"
+    )
+
     @field_validator('response_priority')
     @classmethod
     def validate_priority(cls, v: str) -> str:

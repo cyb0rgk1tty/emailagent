@@ -14,19 +14,60 @@ from models.schemas import AnalyticsOverview, ProductTypeTrendResponse
 router = APIRouter()
 
 
-@router.get("/overview", response_model=AnalyticsOverview)
+@router.get("/summary")
+async def get_analytics_summary(db: AsyncSession = Depends(get_db)):
+    """Get summary analytics for dashboard"""
+    # Total leads (all time)
+    total_leads_result = await db.execute(select(func.count(Lead.id)))
+    total_leads = total_leads_result.scalar() or 0
+
+    # Spam leads count
+    spam_leads_result = await db.execute(
+        select(func.count(Lead.id)).where(Lead.lead_status == 'spam')
+    )
+    spam_leads = spam_leads_result.scalar() or 0
+
+    # Legitimate leads count
+    legitimate_leads = total_leads - spam_leads
+
+    # Average response time (placeholder - would need actual sent timestamps)
+    avg_response_time = "<1m"
+
+    # Spam rate percentage
+    spam_rate = (spam_leads / total_leads * 100) if total_leads > 0 else 0.0
+
+    return {
+        "total_leads": total_leads,
+        "legitimate_leads": legitimate_leads,
+        "spam_leads": spam_leads,
+        "spam_rate": round(spam_rate, 1),
+        "avg_response_time": avg_response_time
+    }
+
+
+@router.get("/overview")
 async def get_analytics_overview(
-    days: int = Query(7, ge=1, le=90),
+    days: int = Query(7, ge=1, le=3650),
     db: AsyncSession = Depends(get_db)
 ):
     """Get analytics overview"""
     cutoff_date = datetime.utcnow() - timedelta(days=days)
 
-    # Total leads
+    # Total leads (excluding spam)
     total_leads_result = await db.execute(
-        select(func.count(Lead.id)).where(Lead.received_at >= cutoff_date)
+        select(func.count(Lead.id))
+        .where(Lead.received_at >= cutoff_date)
+        .where(Lead.lead_status != 'spam')
     )
     total_leads = total_leads_result.scalar() or 0
+
+    # Spam leads count
+    spam_leads_result = await db.execute(
+        select(func.count(Lead.id))
+        .where(Lead.received_at >= cutoff_date)
+        .where(Lead.lead_status == 'spam')
+    )
+    spam_leads = spam_leads_result.scalar() or 0
 
     # Total drafts
     total_drafts_result = await db.execute(select(func.count(Draft.id)))
@@ -38,10 +79,11 @@ async def get_analytics_overview(
     )
     pending_drafts = pending_drafts_result.scalar() or 0
 
-    # Average quality score
+    # Average quality score (excluding spam)
     avg_score_result = await db.execute(
         select(func.avg(Lead.lead_quality_score))
         .where(Lead.received_at >= cutoff_date)
+        .where(Lead.lead_status != 'spam')
         .where(Lead.lead_quality_score.isnot(None))
     )
     avg_quality_score = avg_score_result.scalar() or 0.0
@@ -53,10 +95,11 @@ async def get_analytics_overview(
     approved = approved_result.scalar() or 0
     approval_rate = (approved / total_drafts * 100) if total_drafts > 0 else 0.0
 
-    # Leads by priority
+    # Leads by priority (excluding spam)
     priority_result = await db.execute(
         select(Lead.response_priority, func.count(Lead.id))
         .where(Lead.received_at >= cutoff_date)
+        .where(Lead.lead_status != 'spam')
         .where(Lead.response_priority.isnot(None))
         .group_by(Lead.response_priority)
     )
@@ -72,10 +115,11 @@ async def get_analytics_overview(
     # This is simplified - would need more complex logic for array types
     leads_by_product_type = {}
 
-    # Recent activity (last 10 items)
+    # Recent activity (last 10 items, excluding spam)
     recent_leads = await db.execute(
         select(Lead)
         .where(Lead.received_at >= cutoff_date)
+        .where(Lead.lead_status != 'spam')
         .order_by(Lead.received_at.desc())
         .limit(10)
     )
@@ -90,21 +134,22 @@ async def get_analytics_overview(
         for lead in recent_leads.scalars().all()
     ]
 
-    return AnalyticsOverview(
-        total_leads=total_leads,
-        total_drafts=total_drafts,
-        pending_drafts=pending_drafts,
-        avg_quality_score=round(float(avg_quality_score), 2),
-        approval_rate=round(approval_rate, 2),
-        leads_by_priority=leads_by_priority,
-        leads_by_product_type=leads_by_product_type,
-        recent_activity=recent_activity
-    )
+    return {
+        "total_leads": total_leads,
+        "spam_leads": spam_leads,
+        "total_drafts": total_drafts,
+        "pending_drafts": pending_drafts,
+        "avg_quality_score": round(float(avg_quality_score), 2),
+        "approval_rate": round(approval_rate, 2),
+        "leads_by_priority": leads_by_priority,
+        "leads_by_product_type": leads_by_product_type,
+        "recent_activity": recent_activity
+    }
 
 
 @router.get("/product-trends")
 async def get_product_trends(
-    days: int = Query(30, ge=1, le=365),
+    days: int = Query(30, ge=1, le=3650),
     db: AsyncSession = Depends(get_db)
 ):
     """Get product type trends"""
@@ -123,7 +168,7 @@ async def get_product_trends(
 @router.get("/export/{format}")
 async def export_analytics(
     format: str,
-    days: int = Query(30, ge=1, le=365),
+    days: int = Query(30, ge=1, le=3650),
     db: AsyncSession = Depends(get_db)
 ):
     """Export analytics data (CSV or PDF)"""
