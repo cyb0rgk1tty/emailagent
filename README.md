@@ -1,7 +1,7 @@
 # Supplement Lead Intelligence System
 
 **Version:** 2.2.0
-**Company:** NutriCraft Labs
+**Company:** Nutricraft Labs
 **Status:** Production Ready
 
 ## Overview
@@ -422,7 +422,7 @@ docker compose exec backend python3 -c "from rag import get_semantic_search; imp
 
 ## License
 
-Proprietary - NutriCraft Labs
+Proprietary - Nutricraft Labs
 
 ## Support
 

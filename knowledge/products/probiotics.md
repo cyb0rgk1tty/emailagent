@@ -2,7 +2,7 @@
 
 ## Overview
 
-NutriCraft Labs specializes in custom probiotic supplement manufacturing with state-of-the-art facilities and advanced strain preservation technology.
+Nutricraft Labs specializes in custom probiotic supplement manufacturing with state-of-the-art facilities and advanced strain preservation technology.
 
 ## Available Probiotic Strains
 

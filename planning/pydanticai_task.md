@@ -188,7 +188,7 @@ def get_extraction_model() -> OpenAIChatModel:
                 timeout=settings.LLM_TIMEOUT,
                 headers={
                     "HTTP-Referer": "https://nutricraftlabs.com",  # Optional
-                    "X-Title": "NutriCraft Supplement Lead System"
+                    "X-Title": "Nutricraft Supplement Lead System"
                 }
             )
         ),
@@ -212,7 +212,7 @@ def get_response_model() -> OpenAIChatModel:
                 timeout=settings.LLM_TIMEOUT,
                 headers={
                     "HTTP-Referer": "https://nutricraftlabs.com",
-                    "X-Title": "NutriCraft Supplement Lead System"
+                    "X-Title": "Nutricraft Supplement Lead System"
                 }
             )
         ),
@@ -965,7 +965,7 @@ response_agent = Agent[ResponseDeps, ResponseDraft](
     model=get_response_model(),
     output_type=ResponseDraft,
     deps_type=ResponseDeps,
-    system_prompt="""You are a professional B2B sales representative for NutriCraft Labs,
+    system_prompt="""You are a professional B2B sales representative for Nutricraft Labs,
 a premium supplement contract manufacturing company.
 
 Write personalized email responses to potential customer inquiries using:
@@ -1023,7 +1023,7 @@ async def retrieve_context(ctx: RunContext[ResponseDeps], query: str) -> str:
 
 @response_agent.tool
 async def get_product_capabilities(ctx: RunContext[ResponseDeps], product_types: list[str]) -> str:
-    """Get NutriCraft capabilities for specific product types
+    """Get Nutricraft capabilities for specific product types
 
     Args:
         product_types: List of product types
@@ -1073,7 +1073,7 @@ async def get_dynamic_system_prompt(ctx: RunContext[ResponseDeps]) -> str:
     lead_data = ctx.deps.lead_data
     priority = lead_data.get('response_priority', 'medium')
 
-    base_prompt = """You are a professional B2B sales representative for NutriCraft Labs.
+    base_prompt = """You are a professional B2B sales representative for Nutricraft Labs.
 
 Write a personalized email response to this customer inquiry."""
 
@@ -1169,7 +1169,7 @@ EXTRACTED NEEDS:
 
 Use the retrieve_context and get_product_capabilities tools to get accurate information.
 Structure your response professionally with clear sections.
-Sign as "Sarah Mitchell, Customer Success Manager, NutriCraft Labs"."""
+Sign as "Sarah Mitchell, Customer Success Manager, Nutricraft Labs"."""
 
             # Create dependencies
             deps = ResponseDeps(
@@ -1213,7 +1213,7 @@ Sign as "Sarah Mitchell, Customer Success Manager, NutriCraft Labs"."""
 
         content = f"""Dear {sender_name},
 
-Thank you for reaching out to NutriCraft Labs regarding {product_mention}.
+Thank you for reaching out to Nutricraft Labs regarding {product_mention}.
 
 We'd love to learn more about your specific needs and provide you with detailed information about our manufacturing capabilities, certifications, and pricing.
 
@@ -1224,7 +1224,7 @@ I'm happy to schedule a call to discuss your project in detail.
 Best regards,
 Sarah Mitchell
 Customer Success Manager
-NutriCraft Labs
+Nutricraft Labs
 (555) 123-4567 | sarah.mitchell@nutricraftlabs.com"""
 
         subject = lead_data.get('subject', '')

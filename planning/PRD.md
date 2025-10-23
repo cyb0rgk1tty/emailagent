@@ -3,7 +3,7 @@
 **Version:** 2.0
 **Date:** October 20, 2025
 **Status:** Planning Phase
-**Company:** NutriCraft Labs
+**Company:** Nutricraft Labs
 
 ---
 
@@ -1233,7 +1233,7 @@ services:
 **Prepared by:** Claude AI Assistant
 **Date:** October 20, 2025
 **Document Version:** 2.0
-**Company:** NutriCraft Labs
+**Company:** Nutricraft Labs
 
 **Approval:**
 - [ ] Product Owner / Business Lead

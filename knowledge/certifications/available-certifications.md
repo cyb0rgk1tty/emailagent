@@ -1,6 +1,6 @@
 # Available Certifications & Compliance
 
-## NutriCraft Labs Certification Portfolio
+## Nutricraft Labs Certification Portfolio
 
 Our facility maintains multiple certifications to meet diverse market requirements and customer preferences.
 

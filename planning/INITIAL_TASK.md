@@ -1,6 +1,6 @@
 # Supplement Lead Intelligence System - Implementation Task List
 
-**Project:** NutriCraft Labs Email Agent
+**Project:** Nutricraft Labs Email Agent
 **Version:** 2.0
 **Reference:** See PRD.md for detailed requirements
 **Target:** AI Coding Agent Implementation
@@ -3813,7 +3813,7 @@ Comprehensive testing and bug fixing before production launch.
 ## Next Steps After Completion
 
 1. **Staging Testing:** Deploy to staging environment
-2. **User Training:** Train NutriCraft Labs team on usage
+2. **User Training:** Train Nutricraft Labs team on usage
 3. **Soft Launch:** Monitor first 100 leads closely
 4. **Feedback Collection:** Gather user feedback
 5. **Iteration:** Implement improvements based on feedback

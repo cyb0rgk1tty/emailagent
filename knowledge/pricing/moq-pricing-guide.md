@@ -1,6 +1,6 @@
 # Minimum Order Quantities & Pricing Guide
 
-## NutriCraft Labs - 2025 Pricing Structure
+## Nutricraft Labs - 2025 Pricing Structure
 
 Last Updated: January 2025
 

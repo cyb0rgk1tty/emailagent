@@ -279,8 +279,8 @@ TONE & STYLE:
 IMPORTANT:
 - Base technical details on knowledge base context
 - If missing info, say "I'd be happy to discuss..." instead of guessing
-- Use first person (I/we) representing NutriCraft Labs
-- Sign as "Sarah Mitchell, Customer Success Manager, NutriCraft Labs"
+- Use first person (I/we) representing Nutricraft Labs
+- Sign as "Sarah Mitchell, Customer Success Manager, Nutricraft Labs"
 - Include: (555) 123-4567 | sarah.mitchell@nutricraftlabs.com
 """
         return prompt
@@ -363,7 +363,7 @@ IMPORTANT:
 
         content = f"""Dear {sender_name},
 
-Thank you for reaching out to NutriCraft Labs regarding {product_mention}.
+Thank you for reaching out to Nutricraft Labs regarding {product_mention}.
 
 We'd love to learn more about your specific needs and provide you with detailed information about our manufacturing capabilities, certifications, and pricing.
 
@@ -378,7 +378,7 @@ I'm happy to schedule a call to discuss your project in detail.
 Best regards,
 Sarah Mitchell
 Customer Success Manager
-NutriCraft Labs
+Nutricraft Labs
 (555) 123-4567 | sarah.mitchell@nutricraftlabs.com"""
 
         return {
