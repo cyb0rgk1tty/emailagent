@@ -36,6 +36,7 @@ markdown==3.5.2
 
 # Text Processing
 tiktoken==0.5.2
+beautifulsoup4==4.12.3
 
 # HTTP Client
 httpx==0.28.1  # Required by genai-prices (pydantic-ai dependency)

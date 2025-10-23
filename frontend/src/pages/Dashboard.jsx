@@ -138,45 +138,46 @@ export default function Dashboard() {
             <a href="/leads" className="text-sm text-blue-600 hover:text-blue-800">View all →</a>
           </div>
           <div className="divide-y divide-gray-200">
-            {recentLeads?.data?.slice(0, 5).map((lead) => (
-              <div key={lead.id} className="px-6 py-4 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {lead.sender_name || lead.sender_email}
-                    </p>
-                    <p className="text-sm text-gray-500 truncate">
-                      {lead.subject}
-                    </p>
-                  </div>
-                  <div className="ml-4 flex items-center gap-2">
-                    <span className={`px-2 py-1 text-xs font-medium rounded ${
-                      lead.response_priority === 'critical' ? 'bg-red-100 text-red-800' :
-                      lead.response_priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                      lead.response_priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {lead.response_priority}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {lead.lead_quality_score}/10
-                    </span>
-                  </div>
-                </div>
-                {lead.product_type && lead.product_type.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {lead.product_type.slice(0, 3).map((product) => (
-                      <span key={product} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded">
-                        {product}
+            {recentLeads?.data && recentLeads.data.length > 0 ? (
+              recentLeads.data.slice(0, 5).map((lead) => (
+                <div key={lead.id} className="px-6 py-4 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {lead.sender_name || lead.sender_email}
+                      </p>
+                      <p className="text-sm text-gray-500 truncate">
+                        {lead.subject}
+                      </p>
+                    </div>
+                    <div className="ml-4 flex items-center gap-2">
+                      <span className={`px-2 py-1 text-xs font-medium rounded ${
+                        lead.response_priority === 'critical' ? 'bg-red-100 text-red-800' :
+                        lead.response_priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                        lead.response_priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {lead.response_priority || 'N/A'}
                       </span>
-                    ))}
+                      <span className="text-sm text-gray-500">
+                        {lead.lead_quality_score || 0}/10
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-            {(!recentLeads?.data || recentLeads.data.length === 0) && (
+                  {lead.product_type && lead.product_type.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {lead.product_type.slice(0, 3).map((product, idx) => (
+                        <span key={`${lead.id}-${idx}`} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded">
+                          {product}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
               <div className="px-6 py-8 text-center text-gray-500">
-                No recent leads
+                {recentLeads === undefined ? 'Loading...' : 'No recent leads'}
               </div>
             )}
           </div>

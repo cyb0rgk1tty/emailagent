@@ -57,6 +57,7 @@ export const draftsAPI = {
 }
 
 export const analyticsAPI = {
+  getSummary: () => api.get('/analytics/summary'),
   getOverview: (params) => api.get('/analytics/overview', { params }),
   getProductTrends: (params) => api.get('/analytics/product-trends', { params }),
   export: (format, params) => api.get(`/analytics/export/${format}`, {

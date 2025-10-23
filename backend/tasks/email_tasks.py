@@ -3,6 +3,7 @@ Celery tasks for email processing
 Handles email ingestion, extraction, and response generation
 """
 import logging
+import re
 from typing import Dict, List
 from datetime import datetime
 
@@ -14,6 +15,58 @@ from services.email_service import get_email_service
 from services.email_classifier import get_email_classifier, EmailClassificationType
 
 logger = logging.getLogger(__name__)
+
+
+def strip_html_tags(html_content: str) -> str:
+    """Strip HTML tags from email content and extract plain text
+
+    Args:
+        html_content: HTML content string
+
+    Returns:
+        Plain text content
+    """
+    if not html_content:
+        return html_content
+
+    # Check if content appears to be HTML
+    if not ('<html' in html_content.lower() or '<div' in html_content.lower() or '<p' in html_content.lower()):
+        return html_content
+
+    try:
+        # Try using BeautifulSoup if available
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Remove script and style elements
+        for script in soup(['script', 'style']):
+            script.decompose()
+
+        # Get text
+        text = soup.get_text()
+
+        # Clean up whitespace
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        text = '\n'.join(chunk for chunk in chunks if chunk)
+
+        return text
+    except ImportError:
+        # Fallback: simple regex-based HTML stripping
+        logger.warning("BeautifulSoup not available, using regex fallback for HTML stripping")
+
+        # Remove HTML tags
+        text = re.sub(r'<[^>]+>', '', html_content)
+
+        # Decode HTML entities
+        import html
+        text = html.unescape(text)
+
+        # Clean up excessive whitespace
+        text = re.sub(r'\n\s*\n', '\n\n', text)
+        text = re.sub(r'  +', ' ', text)
+
+        return text.strip()
 
 
 @celery_app.task(name='tasks.email_tasks.check_new_emails')
@@ -72,9 +125,20 @@ def process_email(email_data: Dict):
 
     async def _process():
         message_id = email_data.get('message_id')
-        logger.info(f"Processing email: {message_id}")
+        sender_email = email_data.get('sender_email', '')
+        logger.info(f"Processing email: {message_id} from {sender_email}")
 
         try:
+            # Filter out internal employee emails (but allow contact form from info@)
+            # Contact form submissions come from info@nutricraftlabs.com
+            # Internal employee replies come from employee addresses like cyin@nutricraftlabs.com
+            if '@' in sender_email:
+                sender_lower = sender_email.lower()
+                # Skip internal employee emails but allow info@ (contact form)
+                if sender_lower.endswith('@nutricraftlabs.com') and not sender_lower.startswith('info@'):
+                    logger.info(f"Skipping internal employee email from {sender_email}")
+                    return {'status': 'skipped', 'reason': 'internal_email', 'sender': sender_email}
+
             # Check if already processed
             async with get_db_session() as session:
                 from sqlalchemy import select
@@ -114,6 +178,11 @@ def process_email(email_data: Dict):
     async def _process_new_inquiry(email_data: Dict) -> Dict:
         """Process a new inquiry email"""
         message_id = email_data.get('message_id')
+
+        # Strip HTML from body if present
+        body = email_data.get('body', '')
+        cleaned_body = strip_html_tags(body)
+        email_data['body'] = cleaned_body
 
         # Step 1: Extract data
         extraction_agent = get_extraction_agent()
@@ -260,6 +329,10 @@ def process_email(email_data: Dict):
         conversation_id = metadata.get('conversation_id')
         original_lead_id = metadata.get('original_lead_id')
 
+        # Strip HTML from body if present
+        body = email_data.get('body', '')
+        cleaned_body = strip_html_tags(body)
+
         async with get_db_session() as session:
             # Add message to conversation
             email_message = EmailMessage(
@@ -272,7 +345,7 @@ def process_email(email_data: Dict):
                 sender_email=email_data.get('sender_email'),
                 sender_name=email_data.get('sender_name'),
                 subject=email_data.get('subject'),
-                body=email_data.get('body'),
+                body=cleaned_body,
                 received_at=email_data.get('received_at') or datetime.utcnow()
             )
             session.add(email_message)
@@ -313,6 +386,10 @@ def process_email(email_data: Dict):
         message_id = email_data.get('message_id')
         original_lead_id = metadata.get('original_lead_id')
 
+        # Strip HTML from body if present
+        body = email_data.get('body', '')
+        cleaned_body = strip_html_tags(body)
+
         async with get_db_session() as session:
             # Create duplicate lead entry
             lead = Lead(
@@ -323,7 +400,7 @@ def process_email(email_data: Dict):
                 sender_email=email_data.get('sender_email'),
                 sender_name=email_data.get('sender_name'),
                 subject=email_data.get('subject'),
-                body=email_data.get('body'),
+                body=cleaned_body,
                 received_at=email_data.get('received_at') or datetime.utcnow(),
                 processed_at=datetime.utcnow()
             )
@@ -345,6 +422,11 @@ def process_email(email_data: Dict):
         message_id = email_data.get('message_id')
         parent_lead_id = metadata.get('parent_lead_id')
         parent_conversation_id = metadata.get('conversation_id')
+
+        # Strip HTML from body if present
+        body = email_data.get('body', '')
+        cleaned_body = strip_html_tags(body)
+        email_data['body'] = cleaned_body
 
         # Extract data for new lead
         extraction_agent = get_extraction_agent()
