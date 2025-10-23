@@ -99,41 +99,41 @@ Your role is to write personalized, professional email responses to potential cl
         return base_prompt + """
 
 PRIORITY LEVEL: CRITICAL
-This is a high-value lead with specific needs and urgent timeline.
-- Provide comprehensive, detailed responses
-- Include specific pricing and MOQ information when available
-- Suggest scheduling a call ASAP
-- Demonstrate deep expertise and immediate availability
+High-value lead with urgent needs. Be concise but responsive.
+- Acknowledge urgency without repeating their timeline
+- Suggest immediate call/meeting
+- Show immediate availability
+- Keep under 120 words
 """
     elif lead_priority == 'high':
         return base_prompt + """
 
 PRIORITY LEVEL: HIGH
-This is a qualified lead with clear requirements.
-- Provide detailed information about capabilities
-- Address all specific questions thoroughly
-- Include relevant timelines and process details
-- Suggest a discovery call
+Qualified lead with clear intent. Be direct and actionable.
+- Focus on next steps, not capabilities recap
+- Suggest discovery call
+- Be concise - NO repetition of their requirements
+- Target 100-120 words
 """
     elif lead_priority == 'medium':
         return base_prompt + """
 
 PRIORITY LEVEL: MEDIUM
-This is a standard inquiry with some detail.
-- Provide helpful information about capabilities
-- Address key questions
-- Request additional details to better assist
-- Offer to schedule a conversation
+Standard inquiry. Be helpful and brief.
+- Brief capability mention
+- Ask 1-2 clarifying questions if needed
+- Suggest conversation
+- Target 80-100 words
 """
     else:  # low
         return base_prompt + """
 
 PRIORITY LEVEL: LOW
-This is a general inquiry with limited details.
-- Provide basic information about capabilities
-- Ask clarifying questions to understand needs
-- Keep response concise but helpful
-- Offer resources and next steps
+General inquiry. Be friendly and concise.
+- Quick capability statement
+- Ask what they're looking for
+- Keep it short and simple
+- Target 60-80 words
 """
 
 
@@ -258,12 +258,35 @@ async def validate_response_draft(ctx: RunContext[ResponseDeps], result: Respons
     if len(result.subject_line) < 5:
         raise ModelRetry("Subject line must be at least 5 characters")
 
-    # Check draft content length
+    # Check draft content length (character count)
     if len(result.draft_content) < 100:
         raise ModelRetry("Draft content must be at least 100 characters")
 
     if len(result.draft_content) > 15000:
         raise ModelRetry("Draft content must be less than 15000 characters")
+
+    # Check word count (enforce MAX_DRAFT_LENGTH)
+    word_count = len(result.draft_content.split())
+    max_words = settings.MAX_DRAFT_LENGTH
+    if word_count > max_words:
+        raise ModelRetry(f"Draft is too long ({word_count} words). Must be under {max_words} words. Be more concise.")
+
+    # Check for em dashes and en dashes
+    if '—' in result.draft_content or '–' in result.draft_content:
+        raise ModelRetry("Do not use em dashes (—) or en dashes (–). Use periods or commas instead.")
+
+    # Check for emojis (basic check for common emoji unicode ranges)
+    import re
+    emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags
+        u"\U00002702-\U000027B0"
+        u"\U000024C2-\U0001F251"
+        "]+", flags=re.UNICODE)
+    if emoji_pattern.search(result.draft_content):
+        raise ModelRetry("Do not use emojis in professional email drafts.")
 
     # Check that draft includes proper email format
     if not any(greeting in result.draft_content.lower() for greeting in ['dear', 'hello', 'hi', 'greetings']):
@@ -309,49 +332,57 @@ class ResponseAgentWrapper:
         delivery_formats = lead_data.get('delivery_format') or []
         questions = lead_data.get('specific_questions') or []
 
-        prompt = f"""Write a personalized email response to this potential customer's inquiry.
+        prompt = f"""Write a concise, professional B2B email response to this inquiry from {lead_data.get('sender_name', 'Customer')}.
 
-CUSTOMER INQUIRY:
-From: {lead_data.get('sender_name', 'Customer')} <{lead_data.get('sender_email')}>
-Subject: {lead_data.get('subject')}
+CONTEXT (DO NOT REPEAT IN EMAIL):
+The customer is interested in: {', '.join(product_types) if product_types else 'supplement manufacturing'}
+They need quantity: {lead_data.get('estimated_quantity', 'unspecified')}
+Timeline: {lead_data.get('timeline_urgency', 'exploring')}
 
-Original Message:
-{lead_data.get('body', '')[:500]}...
+Use the get_comprehensive_context tool to retrieve relevant knowledge base information for accurate technical details.
 
-EXTRACTED CUSTOMER NEEDS:
-- Product Types: {', '.join(product_types) if product_types else 'Not specified'}
-- Certifications: {', '.join(certifications) if certifications else 'Not specified'}
-- Delivery Formats: {', '.join(delivery_formats) if delivery_formats else 'Not specified'}
-- Estimated Quantity: {lead_data.get('estimated_quantity', 'Not specified')}
-- Timeline: {lead_data.get('timeline_urgency', 'Not specified')}
-- Experience Level: {lead_data.get('experience_level', 'Not specified')}
-- Specific Questions: {', '.join(questions) if questions else 'None identified'}
+CRITICAL RULES - MUST FOLLOW:
+1. **DO NOT repeat back what the customer already told you**
+2. **DO NOT echo their requirements or specifications**
+3. **Assume they know what they asked for - move forward with value**
+4. Keep response under {settings.MAX_DRAFT_LENGTH} words (strictly enforced)
+5. Be direct and actionable - no fluff or preamble
 
-Use the get_comprehensive_context tool to retrieve relevant knowledge base information, or use search_knowledge_base for specific queries.
-
-INSTRUCTIONS:
-Write a professional B2B email response with:
-
-1. Opening (2-3 sentences): Thank them, acknowledge their needs, brief capability statement
-2. Product/Service Details (3-5 sentences): Address requirements, highlight capabilities, mention certifications
-3. Process & Timeline (2-3 sentences): Typical timeline, next steps, info needed
-4. Call to Action (1-2 sentences): Clear next step
-5. Closing: Professional sign-off
+EMAIL STRUCTURE (3 parts only):
+1. **Brief greeting** (1 sentence): "Hi [Name],"
+2. **Value + Next steps** (2-3 sentences):
+   - Brief capability statement relevant to their needs
+   - What you need from them OR suggest a call
+3. **Call to action** (1 sentence): Clear next step
 
 TONE & STYLE:
-- Professional but warm B2B tone
+- Professional but warm B2B
 - Confident and knowledgeable
-- Specific and concrete
-- Use knowledge base data for accuracy
-- Maximum {settings.MAX_DRAFT_LENGTH} words
+- Direct and concise
+- Action-oriented
 - NO marketing fluff
+- NO repetition of their inquiry
 
-IMPORTANT:
-- Base technical details on knowledge base context
-- If missing info, say "I'd be happy to discuss..." instead of guessing
-- Use first person (I/we) representing {EMAIL_SIGNATURE['company']}
+FORMATTING RULES:
+- Use simple punctuation: periods, commas, semicolons
+- NO em dashes (—) or en dashes (–)
+- NO emojis or special characters
+- Use periods to separate sentences instead of dashes
+- Keep formatting clean and professional
+
+SIGNATURE:
 - Sign as "{EMAIL_SIGNATURE['name']}, {EMAIL_SIGNATURE['title']}, {EMAIL_SIGNATURE['company']}"
 - Include email: {EMAIL_SIGNATURE['email']}
+
+EXAMPLE OF GOOD LENGTH (75-100 words):
+"Hi [Name],
+
+We can definitely help with your supplement project. We specialize in [relevant capability] and have worked with clients in [relevant market].
+
+To provide you with accurate timeline and pricing, I'd like to understand [1-2 specific details you need]. Would you be available for a brief call this week?
+
+Best regards,
+[Signature]"
 """
         return prompt
 

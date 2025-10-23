@@ -101,7 +101,7 @@ class Settings(BaseSettings):
 
     # Response Agent Configuration
     RESPONSE_TONE: str = "professional_b2b"
-    MAX_DRAFT_LENGTH: int = 600  # words
+    MAX_DRAFT_LENGTH: int = 150  # words
     REQUIRE_APPROVAL: bool = True
     MIN_CONFIDENCE_FOR_AUTO_APPROVAL: float = 9.5  # Future use
     INCLUDE_SOURCE_ATTRIBUTION: bool = True
