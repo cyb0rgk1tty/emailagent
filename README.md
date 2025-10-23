@@ -13,6 +13,7 @@ AI-powered lead intelligence system for supplement manufacturing that monitors c
 - 🤖 **PydanticAI Multi-Agent System**: Type-safe extraction, response, and analytics agents
 - 🔄 **OpenRouter Integration**: Flexible LLM provider with Claude 4.5 models
 - 📚 **RAG-Enhanced Responses**: Knowledge base-powered accurate responses
+- 🧠 **Historical Response Learning**: Backfill past emails to teach AI your writing style
 - 📊 **Business Intelligence**: Supplement-specific data extraction and analytics
 - ✅ **Human-in-the-Loop**: Web-based approval workflow
 - 📈 **Analytics Dashboard**: Product trends, lead quality, market insights

@@ -29,6 +29,18 @@ class Settings(BaseSettings):
     EMAIL_SMTP_HOST: str = ""
     EMAIL_SMTP_PORT: int = 587
 
+    # Historical Email Configuration (for backfill)
+    HISTORICAL_EMAIL_ADDRESS: str = ""
+    HISTORICAL_EMAIL_PASSWORD: str = ""
+    HISTORICAL_IMAP_HOST: str = ""
+    HISTORICAL_IMAP_PORT: int = 993
+
+    # Backfill Configuration
+    BACKFILL_SUBJECT_FILTER: str = "Contact Form:"
+    BACKFILL_MAX_EMAILS: int = 1000
+    BACKFILL_LOOKBACK_DAYS: int = 365
+    BACKFILL_BATCH_SIZE: int = 50
+
     # AI Configuration - OpenRouter
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"

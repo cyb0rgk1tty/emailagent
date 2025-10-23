@@ -12,6 +12,8 @@ from models.agent_responses import ResponseDraft
 from models.agent_dependencies import ResponseDeps
 from services.pydantic_ai_client import get_response_model
 from rag import get_semantic_search
+from rag.historical_response_retrieval import get_historical_response_retrieval
+from services.response_learning import get_response_style_analyzer
 from config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -80,6 +82,31 @@ def format_email_signature(signature: Dict[str, str]) -> str:
     ]
 
     return "\n".join(lines)
+
+
+async def get_dynamic_system_prompt_with_learning(lead_priority: str) -> str:
+    """Get system prompt with learned patterns integrated
+
+    Args:
+        lead_priority: Priority level (critical, high, medium, low)
+
+    Returns:
+        Dynamic system prompt with learned patterns
+    """
+    base_prompt = get_dynamic_system_prompt(lead_priority)
+
+    # Try to get learned pattern enhancement
+    try:
+        analyzer = get_response_style_analyzer()
+        learned_enhancement = await analyzer.get_learned_system_prompt_enhancement(lead_priority)
+
+        if learned_enhancement:
+            return base_prompt + learned_enhancement
+
+    except Exception as e:
+        logger.warning(f"Could not load learned patterns: {e}")
+
+    return base_prompt
 
 
 def get_dynamic_system_prompt(lead_priority: str) -> str:
@@ -236,6 +263,50 @@ async def get_comprehensive_context(ctx: RunContext[ResponseDeps]) -> str:
         return "Unable to retrieve comprehensive context at this time."
 
 
+@response_agent.tool
+async def get_similar_past_responses(ctx: RunContext[ResponseDeps]) -> str:
+    """
+    Retrieve similar inquiries from your historical responses as examples.
+
+    This tool finds past inquiries similar to the current one and shows YOUR
+    actual responses to help you adapt your writing style and approach.
+
+    Use this tool to:
+    - See how you handled similar product inquiries
+    - Match your typical response length and tone
+    - Understand what information you typically provide
+    - Learn your question-asking patterns
+
+    Returns:
+        Formatted examples of similar historical inquiries with your responses
+    """
+    try:
+        lead_data = ctx.deps.lead_data
+
+        # Get historical response retrieval service
+        retrieval = get_historical_response_retrieval(top_k=3)
+
+        # Find similar historical responses
+        examples = await retrieval.find_similar_historical_responses(
+            inquiry_data=lead_data,
+            min_similarity=0.6
+        )
+
+        if not examples:
+            return "No similar historical examples found. Proceed with standard approach based on knowledge base."
+
+        # Format examples for LLM
+        formatted_examples = await retrieval.format_examples_for_llm(examples, max_examples=3)
+
+        logger.info(f"Retrieved {len(examples)} historical examples for response generation")
+
+        return formatted_examples
+
+    except Exception as e:
+        logger.error(f"Error retrieving similar past responses: {e}")
+        return "Unable to retrieve historical examples at this time. Proceed with standard approach."
+
+
 @response_agent.output_validator
 async def validate_response_draft(ctx: RunContext[ResponseDeps], result: ResponseDraft) -> ResponseDraft:
     """Validate response draft quality
@@ -339,7 +410,11 @@ The customer is interested in: {', '.join(product_types) if product_types else '
 They need quantity: {lead_data.get('estimated_quantity', 'unspecified')}
 Timeline: {lead_data.get('timeline_urgency', 'exploring')}
 
-Use the get_comprehensive_context tool to retrieve relevant knowledge base information for accurate technical details.
+IMPORTANT TOOLS TO USE:
+1. Use get_similar_past_responses() FIRST to see how YOU handled similar inquiries in the past
+2. Use get_comprehensive_context() to retrieve technical details from knowledge base
+
+Learn from your historical responses to match your typical style, tone, and approach.
 
 CRITICAL RULES - MUST FOLLOW:
 1. **DO NOT repeat back what the customer already told you**
@@ -402,8 +477,9 @@ Best regards,
             # Get lead priority for dynamic system prompt
             priority = lead_data.get('response_priority', 'medium')
 
-            # Override system prompt based on priority
-            response_agent._system_prompts = [get_dynamic_system_prompt(priority)]
+            # Override system prompt with learned patterns
+            enhanced_system_prompt = await get_dynamic_system_prompt_with_learning(priority)
+            response_agent._system_prompts = [enhanced_system_prompt]
 
             # Create dependencies
             deps = ResponseDeps(

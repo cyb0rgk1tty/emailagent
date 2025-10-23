@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 
 from database import engine, Base, init_db, close_db
-from api import leads, drafts, analytics, knowledge, conversations
+from api import leads, drafts, analytics, knowledge, conversations, backfill
 from config import settings
 
 # Configure logging
@@ -70,6 +70,7 @@ app.include_router(drafts.router, prefix="/api/drafts", tags=["Drafts"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["Knowledge Base"])
 app.include_router(conversations.router, prefix="/api", tags=["Conversations"])
+app.include_router(backfill.router, tags=["Historical Backfill"])
 
 
 @app.get("/")

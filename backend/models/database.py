@@ -104,6 +104,12 @@ class Lead(Base):
     # Lead lifecycle status
     lead_status = Column(String, nullable=False, default="new", index=True)
 
+    # Historical backfill tracking
+    is_historical = Column(Boolean, default=False, index=True)
+    source_type = Column(String, default="current", index=True)
+    human_response_body = Column(Text)
+    human_response_date = Column(TIMESTAMP(timezone=True))
+
     # Sender information
     sender_email = Column(String, nullable=False, index=True)
     sender_name = Column(String)
@@ -273,3 +279,38 @@ class AnalyticsSnapshot(Base):
 
     def __repr__(self):
         return f"<AnalyticsSnapshot(date={self.snapshot_date}, type={self.period_type})>"
+
+
+class HistoricalResponseExample(Base):
+    """Historical response examples for RAG learning"""
+    __tablename__ = "historical_response_examples"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Inquiry reference
+    inquiry_lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), index=True)
+
+    # Inquiry data (for matching)
+    inquiry_subject = Column(Text)
+    inquiry_body = Column(Text)
+    inquiry_sender_email = Column(String)
+
+    # Human response data
+    response_body = Column(Text, nullable=False)
+    response_subject = Column(String)
+    response_date = Column(TIMESTAMP(timezone=True))
+
+    # Embedding for semantic search
+    embedding = Column(Vector(1536))
+
+    # Metadata (response characteristics for analysis)
+    response_metadata = Column("metadata", JSONB)
+
+    # Status
+    is_active = Column(Boolean, default=True, index=True)
+
+    # Timestamps
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    def __repr__(self):
+        return f"<HistoricalResponseExample(id={self.id}, lead_id={self.inquiry_lead_id})>"

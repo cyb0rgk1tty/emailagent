@@ -11,7 +11,7 @@ celery_app = Celery(
     "supplement_leads",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=['tasks.email_tasks', 'tasks.analytics_tasks']
+    include=['tasks.email_tasks', 'tasks.analytics_tasks', 'tasks.backfill_tasks']
 )
 
 # Configure Celery

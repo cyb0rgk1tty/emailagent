@@ -5,11 +5,11 @@ FastAPI backend with multi-agent AI system and RAG capabilities.
 ## Structure
 
 - `agents/` - AI agents (extraction, response, analytics)
-- `rag/` - RAG system (document processing, embeddings, retrieval)
-- `services/` - Business logic services
-- `api/` - FastAPI route handlers
+- `rag/` - RAG system (document processing, embeddings, retrieval, historical responses)
+- `services/` - Business logic services (email, backfill, response learning)
+- `api/` - FastAPI route handlers (leads, drafts, analytics, knowledge, backfill)
 - `models/` - Database models and Pydantic schemas
-- `tasks/` - Celery background tasks
+- `tasks/` - Celery background tasks (email, analytics, backfill)
 
 ## Running
 

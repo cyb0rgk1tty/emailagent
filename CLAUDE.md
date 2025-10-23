@@ -116,16 +116,85 @@ knowledge/*.md → ingest_knowledge_base.py → document_embeddings table →
 pgvector search → agent RAG tools → LLM context
 ```
 
+### Historical Response Learning System
+
+The system can backfill historical emails to learn from your actual manual responses, improving AI-generated drafts.
+
+**Architecture:**
+
+1. **Historical Backfill** (`backend/services/historical_backfill.py`)
+   - IMAP server-side filtering (only fetches emails matching subject pattern)
+   - Searches both INBOX and Sent folders simultaneously
+   - Matches responses to inquiries using email threading (In-Reply-To/References)
+   - Fallback matching: Time-based (90-day window) + subject similarity
+   - Stores matched pairs with `is_historical=True` flag
+
+2. **Response Learning** (`backend/services/response_learning.py`)
+   - Analyzes historical responses to extract writing style patterns
+   - Metrics tracked: length, structure, tone, vocabulary, CTAs
+   - Generates enhanced system prompts with learned patterns
+   - Example patterns: avg word count, greeting style, common phrases
+
+3. **Historical Response RAG** (`backend/rag/historical_response_retrieval.py`)
+   - Semantic search for similar past inquiries using pgvector
+   - Returns top-k similar examples with your actual responses
+   - Used by Response Agent's `get_similar_past_responses()` tool
+   - AI adapts tone and style from retrieved examples
+
+**Database Schema:**
+- `historical_response_examples` table: Stores responses with embeddings
+- `leads` table extensions: `is_historical`, `human_response_body`, `human_response_date`
+
+**API Endpoints** (`backend/api/backfill.py`):
+```bash
+POST /api/backfill/start              # Trigger backfill
+GET  /api/backfill/status/{task_id}   # Check progress
+GET  /api/backfill/summary            # View results
+GET  /api/backfill/historical-responses  # Browse stored responses
+POST /api/backfill/analyze-patterns   # Re-analyze writing style
+GET  /api/backfill/test-connection    # Test inbox credentials
+```
+
+**Configuration** (optional, in `.env`):
+```bash
+HISTORICAL_EMAIL_ADDRESS=your.email@domain.com
+HISTORICAL_EMAIL_PASSWORD=...
+HISTORICAL_IMAP_HOST=imap.domain.com
+HISTORICAL_IMAP_PORT=993
+BACKFILL_SUBJECT_FILTER="Contact Form: "
+BACKFILL_LOOKBACK_DAYS=365
+```
+
+**Usage Example:**
+```bash
+# Run backfill (one-time setup)
+curl -X POST http://localhost:8001/api/backfill/start \
+  -H "Content-Type: application/json" \
+  -d '{"limit": 100}'
+
+# Check results
+curl http://localhost:8001/api/backfill/summary
+```
+
+**Response Agent Enhancement:**
+- New tool: `get_similar_past_responses()` retrieves historical examples
+- System prompts enhanced with learned writing patterns
+- AI automatically adapts to your response style
+
 ### Database Models
 
 Two separate model systems (don't confuse them):
 
 1. **SQLAlchemy ORM Models** (`backend/models/database.py`)
    - `Lead`: Extracted email data (JSONB fields for arrays)
+     - Extensions: `is_historical`, `source_type`, `human_response_body`, `human_response_date`
    - `Draft`: Generated response drafts
    - `DocumentEmbedding`: RAG vector store (pgvector)
+   - `HistoricalResponseExample`: Stored historical responses with embeddings for AI learning
    - `ProductTypeTrend`: Analytics tracking
    - `AnalyticsSnapshot`: Daily metrics
+   - `Conversation`: Email thread tracking
+   - `EmailMessage`: Individual email messages (inbound/outbound)
 
 2. **Pydantic Models** (`backend/models/`)
    - `agent_responses.py`: LLM output schemas (LeadExtraction, ResponseDraft)
@@ -159,6 +228,8 @@ RESTful endpoints in `backend/api/`:
 - `/api/drafts`: CRUD for draft responses, approval workflow
 - `/api/analytics`: Metrics, trends, snapshots
 - `/api/knowledge`: Knowledge base document management
+- `/api/backfill`: Historical email backfill and response learning
+- `/api/conversations`: Email conversation threads
 
 All routes use async SQLAlchemy sessions via `Depends(get_db)`.
 
