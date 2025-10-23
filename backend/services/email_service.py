@@ -172,13 +172,17 @@ class EmailService:
                 logger.warning(f"Email {message_id} has no body")
                 return None
 
+            # Parse email headers for thread tracking
+            email_headers = self._parse_email_headers(email_message)
+
             email_data = {
                 'message_id': message_id,
                 'sender_email': sender_email.lower(),
                 'sender_name': sender_name or sender_email,
                 'subject': subject,
                 'body': body,
-                'received_at': received_at
+                'received_at': received_at,
+                'email_headers': email_headers
             }
 
             return email_data
@@ -186,6 +190,54 @@ class EmailService:
         except Exception as e:
             logger.error(f"Error parsing email: {e}")
             return None
+
+    def _parse_email_headers(self, email_message) -> Dict:
+        """Parse email headers for thread tracking (RFC 5322)
+
+        Args:
+            email_message: Email message object
+
+        Returns:
+            Dictionary of email headers
+        """
+        headers = {}
+
+        try:
+            # Thread tracking headers
+            headers['in_reply_to'] = email_message.get('In-Reply-To', '').strip()
+            headers['references'] = email_message.get('References', '').strip()
+
+            # Parse References header into list
+            if headers['references']:
+                # References can be space or newline separated list of message IDs
+                refs_list = headers['references'].replace('\n', ' ').replace('\r', '').split()
+                headers['references_list'] = refs_list
+            else:
+                headers['references_list'] = []
+
+            # Microsoft-specific thread index
+            headers['thread_index'] = email_message.get('Thread-Index', '').strip()
+
+            # Additional useful headers
+            headers['reply_to'] = email_message.get('Reply-To', '').strip()
+            headers['cc'] = email_message.get('Cc', '').strip()
+            headers['bcc'] = email_message.get('Bcc', '').strip()
+
+            # Check if email is likely a forward
+            subject = email_message.get('Subject', '')
+            headers['is_likely_forward'] = any(
+                subject.lower().startswith(prefix)
+                for prefix in ['fwd:', 'fw:', 'forward:']
+            )
+
+            logger.debug(f"Parsed headers: in_reply_to={headers['in_reply_to']}, "
+                        f"references_count={len(headers['references_list'])}")
+
+            return headers
+
+        except Exception as e:
+            logger.error(f"Error parsing email headers: {e}")
+            return {}
 
     def _get_email_body(self, email_message) -> str:
         """Extract email body text

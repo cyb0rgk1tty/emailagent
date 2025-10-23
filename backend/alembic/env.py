@@ -11,7 +11,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Import your Base and models
 from database import Base
-from models.database import Lead, Draft, DocumentEmbedding, ProductTypeTrend, AnalyticsSnapshot
+from models.database import (
+    Conversation, EmailMessage, Lead, Draft,
+    DocumentEmbedding, ProductTypeTrend, AnalyticsSnapshot
+)
 
 # this is the Alembic Config object
 config = context.config

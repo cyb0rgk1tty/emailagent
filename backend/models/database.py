@@ -5,10 +5,85 @@ from sqlalchemy import (
     Column, Integer, String, Text, TIMESTAMP, Boolean, Float,
     ForeignKey, ARRAY, CheckConstraint
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
 from database import Base
+
+
+class Conversation(Base):
+    """Conversation model - groups related emails into threads"""
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Thread identification
+    thread_subject = Column(Text, nullable=False)
+    participants = Column(ARRAY(String), nullable=False)  # List of email addresses
+
+    # Thread metadata
+    initial_message_id = Column(String, unique=True, nullable=False, index=True)
+    last_message_id = Column(String, index=True)
+
+    # Timestamps
+    started_at = Column(TIMESTAMP(timezone=True), nullable=False, index=True)
+    last_activity_at = Column(TIMESTAMP(timezone=True), nullable=False, index=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<Conversation(id={self.id}, subject={self.thread_subject[:50]})>"
+
+
+class EmailMessage(Base):
+    """EmailMessage model - stores all email messages (inbound and outbound)"""
+    __tablename__ = "email_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Message identification
+    message_id = Column(String, unique=True, nullable=False, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), index=True)
+
+    # Message direction and type
+    direction = Column(String, nullable=False, index=True)  # 'inbound' or 'outbound'
+    message_type = Column(String, default="email")  # 'email', 'note', 'system'
+
+    # Email headers (RFC 5322)
+    email_headers = Column(JSONB)  # Stores In-Reply-To, References, etc.
+
+    # Content
+    sender_email = Column(String, nullable=False, index=True)
+    sender_name = Column(String)
+    recipient_email = Column(String)
+    recipient_name = Column(String)
+    subject = Column(Text)
+    body = Column(Text, nullable=False)
+
+    # Metadata
+    is_draft_sent = Column(Boolean, default=False)  # True if this is a sent draft
+    draft_id = Column(Integer, ForeignKey("drafts.id", ondelete="SET NULL"))
+
+    # Timestamps
+    sent_at = Column(TIMESTAMP(timezone=True), index=True)
+    received_at = Column(TIMESTAMP(timezone=True), index=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "direction IN ('inbound', 'outbound')",
+            name='valid_direction'
+        ),
+        CheckConstraint(
+            "message_type IN ('email', 'note', 'system')",
+            name='valid_message_type'
+        ),
+    )
+
+    def __repr__(self):
+        return f"<EmailMessage(id={self.id}, direction={self.direction}, from={self.sender_email})>"
 
 
 class Lead(Base):
@@ -17,6 +92,17 @@ class Lead(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     message_id = Column(String, unique=True, nullable=False)
+
+    # Thread tracking and relationships
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="SET NULL"), index=True)
+    parent_lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), index=True)
+
+    # Duplicate detection
+    is_duplicate = Column(Boolean, default=False, index=True)
+    duplicate_of_lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"))
+
+    # Lead lifecycle status
+    lead_status = Column(String, nullable=False, default="new", index=True)
 
     # Sender information
     sender_email = Column(String, nullable=False, index=True)
@@ -58,9 +144,16 @@ class Lead(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    # Relationships
+    drafts = relationship("Draft", back_populates="lead")
+
     __table_args__ = (
         CheckConstraint('lead_quality_score >= 1 AND lead_quality_score <= 10', name='valid_quality_score'),
         CheckConstraint("response_priority IN ('critical', 'high', 'medium', 'low')", name='valid_priority'),
+        CheckConstraint(
+            "lead_status IN ('new', 'responded', 'customer_replied', 'conversation_active', 'closed')",
+            name='valid_lead_status'
+        ),
     )
 
     def __repr__(self):
@@ -99,6 +192,9 @@ class Draft(Base):
     # Learning data
     customer_replied = Column(Boolean)
     customer_sentiment = Column(String)
+
+    # Relationships
+    lead = relationship("Lead", back_populates="drafts")
 
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'approved', 'rejected', 'sent', 'edited')", name='valid_draft_status'),

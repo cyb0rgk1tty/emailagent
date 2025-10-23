@@ -76,4 +76,12 @@ export const knowledgeAPI = {
   getStats: () => api.get('/knowledge/stats'),
 }
 
+export const conversationsAPI = {
+  getById: (id) => api.get(`/conversations/${id}`),
+  getByLead: (leadId) => api.get(`/conversations/lead/${leadId}`),
+  getTimeline: (leadId) => api.get(`/conversations/lead/${leadId}/timeline`),
+  getBySender: (email) => api.get(`/conversations/sender/${email}`),
+  getAll: (params) => api.get('/conversations', { params }),
+}
+
 export default api

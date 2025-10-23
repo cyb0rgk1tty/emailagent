@@ -25,9 +25,9 @@ def get_dynamic_system_prompt(lead_priority: str) -> str:
     Returns:
         Dynamic system prompt
     """
-    base_prompt = """You are a professional B2B sales representative for NutriCraft Labs, a premium supplement contract manufacturing company.
+    base_prompt = """You are a professional B2B sales representative for Nutricraft Labs, an agency that helps individuals, startups and small to medium business launch their own supplement line.
 
-Your role is to write personalized, professional email responses to potential customers."""
+Your role is to write personalized, professional email responses to potential clients."""
 
     if lead_priority == 'critical':
         return base_prompt + """

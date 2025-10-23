@@ -22,7 +22,9 @@ async def get_drafts(
     db: AsyncSession = Depends(get_db)
 ):
     """Get all drafts with optional filtering"""
-    query = select(Draft).order_by(desc(Draft.created_at))
+    from sqlalchemy.orm import selectinload
+
+    query = select(Draft).options(selectinload(Draft.lead)).order_by(desc(Draft.created_at))
 
     if status:
         query = query.where(Draft.status == status)
@@ -40,8 +42,11 @@ async def get_pending_drafts(
     db: AsyncSession = Depends(get_db)
 ):
     """Get pending drafts for approval"""
+    from sqlalchemy.orm import selectinload
+
     query = (
         select(Draft)
+        .options(selectinload(Draft.lead))
         .where(Draft.status == 'pending')
         .order_by(desc(Draft.created_at))
         .limit(limit)

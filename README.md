@@ -1,6 +1,6 @@
 # Supplement Lead Intelligence System
 
-**Version:** 2.1.0
+**Version:** 2.2.0
 **Company:** NutriCraft Labs
 **Status:** Production Ready
 
@@ -18,6 +18,8 @@ AI-powered lead intelligence system for supplement manufacturing that monitors c
 - 📈 **Analytics Dashboard**: Product trends, lead quality, market insights
 - 🔍 **Vector Search**: PostgreSQL with pgvector for semantic search
 - 🛡️ **Type Safety**: Pydantic models with automatic validation and retries
+- 🧵 **Email Thread Tracking**: Conversation threading, duplicate detection, reply handling
+- 💼 **Complete Dashboard**: Analytics, leads browser, knowledge base management
 
 ## Tech Stack
 
@@ -89,6 +91,48 @@ All agent outputs are validated by Pydantic models:
 - **Retry mechanism**: 2 attempts on validation failure
 - **Fallback systems**: Graceful degradation
 - **Type hints**: Full IDE support
+
+## Dashboard Features
+
+The React-based dashboard provides a complete management interface:
+
+### 📊 Analytics Page (`/analytics`)
+- **Interactive Charts**: Priority distribution (pie), quality scores (bar), product types (horizontal bar), timeline trends (line)
+- **Time Range Filters**: 7, 14, 30, or 90 days
+- **Key Metrics**: Total leads, avg quality score, approval rate, pending review
+- **Recent Activity Feed**: Real-time activity stream with timestamps
+- **Powered by**: Recharts library for beautiful, responsive visualizations
+
+### 📥 Inbox Page (`/inbox`)
+- **Draft Review**: Approve, reject, or edit AI-generated email responses
+- **Quick Actions**: One-click approve/reject with confirmation
+- **Status Filtering**: Pending, approved, rejected, sent, all drafts
+- **Confidence Scoring**: See AI confidence for each draft (0-10)
+- **Lead Context**: View full lead details with each draft
+- **Auto-Refresh**: Updates every 30 seconds
+
+### 🔍 Leads Page (`/leads`)
+- **Powerful Search**: Filter by email, name, company, subject, or body content
+- **Multi-Filter System**: Priority (critical/high/medium/low), status (new/responded/customer_replied/etc.)
+- **Sort Options**: By date, quality score, or priority
+- **Lead Details Modal**: Full lead information, conversation timeline, product interests
+- **Thread Tracking**: View complete email conversation history
+- **Status Badges**: Visual indicators for priority, status, duplicates
+- **Stats Dashboard**: Total, new, responded, customer replied, avg quality
+
+### 📚 Knowledge Base Page (`/knowledge`)
+- **Document Management**: View, upload, and deactivate knowledge base documents
+- **Stats Overview**: Total documents, chunks, document type breakdown
+- **RAG Query Tester**: Test semantic search with similarity scores
+- **Re-index Control**: Trigger full knowledge base re-indexing
+- **Document Details**: Chunk counts, versions, last updated timestamps
+- **Type Filtering**: Documents organized by type (FAQ, process, pricing, capability)
+
+### 🏠 Dashboard Page (`/`)
+- **Overview Metrics**: Total leads, pending drafts, avg response time
+- **Recent Leads**: Last 5 leads with quality scores and priorities
+- **Pending Drafts**: Quick access to drafts needing review
+- **System Status**: RAG system, AI agents, email service health
 
 ## Quick Start
 
@@ -310,11 +354,22 @@ Expected response:
 ## Documentation
 
 - [PydanticAI Implementation Summary](PYDANTICAI_IMPLEMENTATION_SUMMARY.md) - Complete implementation details
+- [Thread Tracking Implementation](THREAD_TRACKING_IMPLEMENTATION.md) - Email threading and duplicate detection
 - [Product Requirements Document (PRD)](planning/PRD.md) - Product requirements
 - [PydanticAI Task List](planning/pydanticai_task.md) - Implementation phases
 - [API Documentation](http://localhost:8001/api/docs) - Interactive API docs (when running)
 
 ## Recent Updates
+
+### Version 2.2.0 (October 2025)
+- ✅ **Complete Frontend Dashboard**: All pages fully implemented
+- ✅ **Analytics Page**: Interactive charts with Recharts (pie, bar, line charts)
+- ✅ **Leads Browser**: Advanced search, filters, sorting, conversation timeline viewer
+- ✅ **Knowledge Base Management**: Document viewer, upload UI, RAG query tester
+- ✅ **Email Thread Tracking**: Conversation threading, duplicate detection, reply classification
+- ✅ **CORS Configuration**: Network IP support for LAN access
+- ✅ **Database Relationships**: Lead-Draft relationships with eager loading
+- ✅ **Conversation API**: Full timeline view with all email interactions
 
 ### Version 2.1.0 (October 2025)
 - ✅ **PydanticAI Integration**: Complete migration to PydanticAI framework

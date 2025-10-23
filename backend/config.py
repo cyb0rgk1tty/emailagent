@@ -52,6 +52,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:3001",
         "http://frontend:3000",
+        "http://192.168.50.5:3001",  # Network IP frontend
+        "http://192.168.50.5:8001",  # Network IP backend
         "https://nutricraftlabs.com"
     ]
 

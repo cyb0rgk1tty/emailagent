@@ -66,7 +66,7 @@ export default function Inbox() {
     return colors[status] || colors.pending
   }
 
-  const draftsList = drafts?.data || []
+  const draftsList = Array.isArray(drafts?.data) ? drafts.data : (Array.isArray(drafts) ? drafts : [])
 
   return (
     <div className="space-y-6">

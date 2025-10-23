@@ -31,6 +31,13 @@ class LeadExtracted(LeadBase):
     received_at: datetime
     processed_at: Optional[datetime] = None
 
+    # Thread tracking and relationships
+    conversation_id: Optional[int] = None
+    parent_lead_id: Optional[int] = None
+    is_duplicate: bool = False
+    duplicate_of_lead_id: Optional[int] = None
+    lead_status: str = "new"
+
     # Extracted data
     product_type: List[str] = []
     specific_ingredients: List[str] = []
@@ -107,6 +114,9 @@ class DraftResponse(DraftBase):
 
     customer_replied: Optional[bool] = None
     customer_sentiment: Optional[str] = None
+
+    # Relationship
+    lead: Optional["LeadExtracted"] = None
 
     class Config:
         from_attributes = True
@@ -236,10 +246,71 @@ class RAGResponse(BaseModel):
     total_results: int
 
 
+# ==================== Conversation Schemas ====================
+
+class ConversationResponse(BaseModel):
+    """Schema for conversation response"""
+    id: int
+    thread_subject: str
+    participants: List[str]
+    initial_message_id: str
+    last_message_id: Optional[str] = None
+    started_at: datetime
+    last_activity_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EmailMessageResponse(BaseModel):
+    """Schema for email message in conversation"""
+    id: int
+    message_id: str
+    conversation_id: int
+    lead_id: Optional[int] = None
+    direction: str  # 'inbound' or 'outbound'
+    message_type: str
+    email_headers: Optional[Dict[str, Any]] = None
+    sender_email: str
+    sender_name: Optional[str] = None
+    recipient_email: Optional[str] = None
+    recipient_name: Optional[str] = None
+    subject: Optional[str] = None
+    body: str
+    is_draft_sent: bool = False
+    draft_id: Optional[int] = None
+    sent_at: Optional[datetime] = None
+    received_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationWithMessages(BaseModel):
+    """Schema for conversation with all messages"""
+    conversation: ConversationResponse
+    messages: List[EmailMessageResponse]
+    total_messages: int
+    lead_info: Optional[Dict[str, Any]] = None
+
+
+class ConversationTimeline(BaseModel):
+    """Schema for conversation timeline"""
+    conversation_id: int
+    lead_id: int
+    thread_subject: str
+    timeline: List[Dict[str, Any]]
+    started_at: datetime
+    last_activity_at: datetime
+
+
 # ==================== Email Schemas ====================
 
-class EmailMessage(BaseModel):
-    """Schema for email message"""
+class EmailMessageSimple(BaseModel):
+    """Schema for simple email message (legacy)"""
     subject: str
     body: str
     to_email: EmailStr
