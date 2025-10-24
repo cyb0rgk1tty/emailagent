@@ -181,6 +181,31 @@ curl http://localhost:8001/api/backfill/summary
 - System prompts enhanced with learned writing patterns
 - AI automatically adapts to your response style
 
+**Continuous Learning from Edited Drafts:**
+
+The system now automatically captures edited drafts as training data for ongoing improvement:
+
+- **When**: Triggered when you send an approved draft that was edited
+- **Where**: `backend/tasks/email_tasks.py` in `send_approved_draft()` task
+- **Detection**: Checks for `draft.edit_summary` field (set when draft is edited)
+- **Storage**: Creates `HistoricalResponseExample` with:
+  - Original inquiry (subject + body)
+  - Your edited response (the corrected version)
+  - Embedding for semantic search
+  - Metadata: `was_edited=True`, `edit_summary`, `source='edited_draft'`
+- **Result**: Future similar inquiries retrieve your edited responses as examples
+
+**Flow:**
+```
+Edit Draft → Save (sets edit_summary) → Approve → Send →
+  → Auto-capture as HistoricalResponseExample → AI learns from correction
+```
+
+**Why edited drafts only?**
+- High-signal learning: Only captures corrections, not redundant data
+- Unedited approved drafts are skipped (AI got it right already)
+- Each correction makes the AI smarter for future similar inquiries
+
 ### Database Models
 
 Two separate model systems (don't confuse them):
@@ -208,12 +233,17 @@ Two separate model systems (don't confuse them):
 Located in `backend/tasks/`:
 
 1. **Email Tasks** (`email_tasks.py`)
-   - `check_and_process_emails`: Polls IMAP every 5 minutes
-   - `process_single_email`: Pipeline: fetch → extract → generate draft → save
+   - `check_new_emails`: Polls IMAP every 5 minutes (date-based filtering, last 7 days)
+   - `process_email`: Pipeline: fetch → classify → extract → generate draft → save
+   - `send_approved_draft`: Sends approved drafts + captures edited drafts as training data
 
 2. **Analytics Tasks** (`analytics_tasks.py`)
    - `generate_daily_analytics`: Runs at midnight
    - `update_product_trends`: Tracks mentions over time
+
+3. **Backfill Tasks** (`backfill_tasks.py`)
+   - `backfill_historical_emails`: One-time backfill of historical emails
+   - `analyze_response_patterns`: Extract writing style patterns
 
 **Celery Configuration:**
 - Broker: Redis

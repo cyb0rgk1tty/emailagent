@@ -1,6 +1,6 @@
 # Supplement Lead Intelligence System
 
-**Version:** 2.2.0
+**Version:** 2.3.0
 **Company:** Nutricraft Labs
 **Status:** Production Ready
 
@@ -13,7 +13,7 @@ AI-powered lead intelligence system for supplement manufacturing that monitors c
 - 🤖 **PydanticAI Multi-Agent System**: Type-safe extraction, response, and analytics agents
 - 🔄 **OpenRouter Integration**: Flexible LLM provider with Claude 4.5 models
 - 📚 **RAG-Enhanced Responses**: Knowledge base-powered accurate responses
-- 🧠 **Historical Response Learning**: Backfill past emails to teach AI your writing style
+- 🧠 **Historical Response Learning**: Backfill past emails + continuous learning from edited drafts
 - 📊 **Business Intelligence**: Supplement-specific data extraction and analytics
 - ✅ **Human-in-the-Loop**: Web-based approval workflow
 - 📈 **Analytics Dashboard**: Product trends, lead quality, market insights
@@ -361,6 +361,13 @@ Expected response:
 - [API Documentation](http://localhost:8001/api/docs) - Interactive API docs (when running)
 
 ## Recent Updates
+
+### Version 2.3.0 (October 2025)
+- ✅ **Continuous Learning**: Edited drafts automatically captured as training data
+- ✅ **Date-Based Email Filtering**: Checks last 7 days instead of UNSEEN only
+- ✅ **Improved Duplicate Detection**: Prevents reprocessing with free database lookups
+- ✅ **Fixed API Validation**: Optional list fields in Pydantic schemas
+- ✅ **Enhanced Training Data**: AI learns from your corrections in real-time
 
 ### Version 2.2.0 (October 2025)
 - ✅ **Complete Frontend Dashboard**: All pages fully implemented

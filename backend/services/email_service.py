@@ -36,14 +36,16 @@ class EmailService:
         self,
         limit: int = 50,
         folder: str = 'INBOX',
-        mark_as_seen: bool = False
+        mark_as_seen: bool = False,
+        since_days: int = 7
     ) -> List[Dict]:
-        """Fetch new unread emails from IMAP server
+        """Fetch emails from IMAP server using date-based filtering
 
         Args:
             limit: Maximum number of emails to fetch
             folder: IMAP folder to check
             mark_as_seen: Mark emails as read after fetching
+            since_days: Fetch emails from last N days (default: 7)
 
         Returns:
             List of email data dictionaries
@@ -65,8 +67,15 @@ class EmailService:
             # Select folder
             mail.select(folder)
 
-            # Search for unread emails
-            search_criteria = 'UNSEEN' if not mark_as_seen else 'ALL'
+            # Calculate date cutoff for filtering
+            from datetime import timedelta
+            cutoff_date = datetime.utcnow() - timedelta(days=since_days)
+            date_str = cutoff_date.strftime('%d-%b-%Y')
+
+            # Search for emails since cutoff date (checks ALL emails, not just UNSEEN)
+            # This ensures we capture emails even if they've been marked as read
+            search_criteria = f'SINCE {date_str}'
+            logger.info(f"Searching for emails since {date_str}")
             status, messages = mail.search(None, search_criteria)
 
             if status != 'OK':

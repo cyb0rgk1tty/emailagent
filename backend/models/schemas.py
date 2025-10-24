@@ -39,17 +39,17 @@ class LeadExtracted(LeadBase):
     lead_status: str = "new"
 
     # Extracted data
-    product_type: List[str] = []
-    specific_ingredients: List[str] = []
-    delivery_format: List[str] = []
-    certifications_requested: List[str] = []
+    product_type: Optional[List[str]] = None
+    specific_ingredients: Optional[List[str]] = None
+    delivery_format: Optional[List[str]] = None
+    certifications_requested: Optional[List[str]] = None
 
     # Business intelligence
     estimated_quantity: Optional[str] = None
     timeline_urgency: Optional[str] = None
     budget_indicator: Optional[str] = None
     experience_level: Optional[str] = None
-    distribution_channel: List[str] = []
+    distribution_channel: Optional[List[str]] = None
     has_existing_brand: Optional[bool] = None
 
     # Lead scoring
@@ -57,7 +57,7 @@ class LeadExtracted(LeadBase):
     response_priority: Optional[str] = None
 
     # Metadata
-    specific_questions: List[str] = []
+    specific_questions: Optional[List[str]] = None
     geographic_region: Optional[str] = None
     extraction_confidence: Optional[float] = None
     internal_notes: Optional[str] = None

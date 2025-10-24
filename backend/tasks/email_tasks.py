@@ -7,6 +7,8 @@ import re
 from typing import Dict, List
 from datetime import datetime
 
+from sqlalchemy import select
+
 from tasks.celery_app import celery_app
 from database import get_db_session
 from models.database import Lead, Draft, Conversation, EmailMessage
@@ -80,8 +82,10 @@ def check_new_emails():
         try:
             email_service = get_email_service()
 
-            # Fetch new emails
-            new_emails = await email_service.fetch_new_emails(limit=50)
+            # Fetch emails from last 7 days (date-based filtering instead of UNSEEN)
+            # This captures emails even if they've been marked as read in email client
+            # Duplicate detection (by message_id) prevents reprocessing
+            new_emails = await email_service.fetch_new_emails(limit=50, since_days=7)
 
             if not new_emails:
                 logger.info("No new emails found")
@@ -682,6 +686,45 @@ def send_approved_draft(draft_id: int):
                         if conversation:
                             conversation.last_message_id = sent_message_id
                             conversation.last_activity_at = datetime.utcnow()
+
+                    # Capture edited drafts as training data for AI learning
+                    if draft.edit_summary:
+                        from models.database import HistoricalResponseExample
+                        from rag.embeddings import get_embedding_generator
+
+                        logger.info(f"📚 Capturing edited draft {draft_id} as training example")
+
+                        try:
+                            # Build inquiry text for embedding
+                            inquiry_text = f"{lead.subject}\n\n{lead.body}" if lead.subject and lead.body else (lead.body or lead.subject or "")
+
+                            # Generate embedding for semantic search
+                            embedder = get_embedding_generator()
+                            inquiry_embedding = await embedder.generate_query_embedding(inquiry_text)
+
+                            # Create historical example with edited response
+                            historical_example = HistoricalResponseExample(
+                                inquiry_lead_id=lead.id,
+                                inquiry_subject=lead.subject,
+                                inquiry_body=lead.body,
+                                inquiry_sender_email=lead.sender_email,
+                                response_body=draft.draft_content,  # Edited version
+                                response_subject=draft.subject_line,
+                                response_date=datetime.utcnow(),
+                                embedding=inquiry_embedding,
+                                response_metadata={
+                                    'was_edited': True,
+                                    'edit_summary': draft.edit_summary,
+                                    'original_confidence': draft.confidence_score,
+                                    'source': 'edited_draft',
+                                    'draft_id': draft_id
+                                }
+                            )
+                            session.add(historical_example)
+                            logger.info(f"✅ Saved edited draft as historical example for future learning")
+                        except Exception as e:
+                            logger.error(f"⚠️ Failed to capture edited draft as training data: {e}")
+                            # Don't fail the whole send operation if training capture fails
 
                     await session.commit()
 
