@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     EMAIL_IMAP_PORT: int = 993
     EMAIL_SMTP_HOST: str = ""
     EMAIL_SMTP_PORT: int = 587
+    EMAIL_CC_RECIPIENTS: str = "cyin@nutricraftlabs.com,david@nutricraftlabs.com"  # Always CC these addresses
 
     # Historical Email Configuration (for backfill)
     HISTORICAL_EMAIL_ADDRESS: str = ""

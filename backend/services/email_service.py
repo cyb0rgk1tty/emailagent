@@ -334,6 +334,12 @@ class EmailService:
             msg['To'] = f"{to_name} <{to_email}>"
             msg['Subject'] = subject
 
+            # Add CC recipients (always include these team members)
+            cc_recipients = settings.EMAIL_CC_RECIPIENTS
+            if cc_recipients:
+                msg['Cc'] = cc_recipients
+                logger.info(f"Adding CC recipients: {cc_recipients}")
+
             if in_reply_to:
                 msg['In-Reply-To'] = in_reply_to
                 msg['References'] = in_reply_to
@@ -348,7 +354,7 @@ class EmailService:
                 server.login(self.email_address, self.email_password)
                 server.send_message(msg)
 
-            logger.info(f"Sent email to {to_email}: {subject}")
+            logger.info(f"Sent email to {to_email} (CC: {cc_recipients}): {subject}")
             return True
 
         except Exception as e:
