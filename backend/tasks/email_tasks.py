@@ -15,6 +15,7 @@ from models.database import Lead, Draft, Conversation, EmailMessage
 from agents import get_extraction_agent, get_response_agent, get_analytics_agent
 from services.email_service import get_email_service
 from services.email_classifier import get_email_classifier, EmailClassificationType
+from utils.email_utils import html_to_text
 
 logger = logging.getLogger(__name__)
 
@@ -22,53 +23,16 @@ logger = logging.getLogger(__name__)
 def strip_html_tags(html_content: str) -> str:
     """Strip HTML tags from email content and extract plain text
 
+    This function now uses the shared html_to_text utility for consistent
+    HTML-to-text conversion across the codebase.
+
     Args:
         html_content: HTML content string
 
     Returns:
         Plain text content
     """
-    if not html_content:
-        return html_content
-
-    # Check if content appears to be HTML
-    if not ('<html' in html_content.lower() or '<div' in html_content.lower() or '<p' in html_content.lower()):
-        return html_content
-
-    try:
-        # Try using BeautifulSoup if available
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html_content, 'html.parser')
-
-        # Remove script and style elements
-        for script in soup(['script', 'style']):
-            script.decompose()
-
-        # Get text
-        text = soup.get_text()
-
-        # Clean up whitespace
-        lines = (line.strip() for line in text.splitlines())
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        text = '\n'.join(chunk for chunk in chunks if chunk)
-
-        return text
-    except ImportError:
-        # Fallback: simple regex-based HTML stripping
-        logger.warning("BeautifulSoup not available, using regex fallback for HTML stripping")
-
-        # Remove HTML tags
-        text = re.sub(r'<[^>]+>', '', html_content)
-
-        # Decode HTML entities
-        import html
-        text = html.unescape(text)
-
-        # Clean up excessive whitespace
-        text = re.sub(r'\n\s*\n', '\n\n', text)
-        text = re.sub(r'  +', ' ', text)
-
-        return text.strip()
+    return html_to_text(html_content)
 
 
 @celery_app.task(name='tasks.email_tasks.check_new_emails')

@@ -3,7 +3,7 @@ Drafts API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_, and_
 from typing import List, Optional
 from datetime import datetime
 
@@ -24,10 +24,30 @@ async def get_drafts(
     """Get all drafts with optional filtering"""
     from sqlalchemy.orm import selectinload
 
-    query = select(Draft).options(selectinload(Draft.lead)).order_by(desc(Draft.created_at))
+    query = (
+        select(Draft)
+        .options(selectinload(Draft.lead))
+        .join(Lead, Draft.lead_id == Lead.id)
+        .order_by(desc(Draft.created_at))
+    )
 
     if status:
         query = query.where(Draft.status == status)
+
+        # For pending status, only show initial inquiries
+        if status == 'pending':
+            query = query.where(
+                Lead.parent_lead_id.is_(None),  # Only initial inquiries
+                Lead.lead_status != 'customer_replied',  # Not a reply to our email
+                ~Lead.subject.ilike('Re:%')  # Exclude emails with "Re:" prefix
+            )
+    else:
+        # When no status specified, also filter to initial inquiries by default
+        query = query.where(
+            Lead.parent_lead_id.is_(None),
+            Lead.lead_status != 'customer_replied',
+            ~Lead.subject.ilike('Re:%')
+        )
 
     query = query.offset(skip).limit(limit)
 
@@ -41,13 +61,19 @@ async def get_pending_drafts(
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get pending drafts for approval"""
+    """Get pending drafts for approval (initial inquiries only)"""
     from sqlalchemy.orm import selectinload
 
     query = (
         select(Draft)
         .options(selectinload(Draft.lead))
-        .where(Draft.status == 'pending')
+        .join(Lead, Draft.lead_id == Lead.id)
+        .where(
+            Draft.status == 'pending',
+            Lead.parent_lead_id.is_(None),  # Only initial inquiries
+            Lead.lead_status != 'customer_replied',  # Not a reply to our email
+            ~Lead.subject.ilike('Re:%')  # Exclude emails with "Re:" prefix (replies)
+        )
         .order_by(desc(Draft.created_at))
         .limit(limit)
     )
@@ -149,6 +175,11 @@ async def approve_draft(
             draft.draft_content = approval.edited_content
         if approval.edited_subject:
             draft.subject_line = approval.edited_subject
+
+    elif approval.action == "skip":
+        # Mark as skipped (already handled manually)
+        draft.status = "skipped"
+        draft.approval_feedback = approval.feedback or "Already handled manually"
 
     # Save customer sentiment feedback if provided
     if hasattr(approval, 'customer_sentiment') and approval.customer_sentiment:

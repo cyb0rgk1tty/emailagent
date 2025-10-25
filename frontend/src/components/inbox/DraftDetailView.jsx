@@ -48,6 +48,12 @@ export default function DraftDetailView({ draft }) {
     }
   }
 
+  const handleSkip = () => {
+    if (confirm('Skip this draft? (Use this if you already replied manually)')) {
+      approveMutation.mutate({ action: 'skip' })
+    }
+  }
+
   const handleEdit = () => {
     if (isEditMode) {
       // Cancel edit mode
@@ -90,6 +96,7 @@ export default function DraftDetailView({ draft }) {
       approved: 'bg-green-100 text-green-800',
       rejected: 'bg-red-100 text-red-800',
       sent: 'bg-purple-100 text-purple-800',
+      skipped: 'bg-gray-100 text-gray-800',
       edited: 'bg-yellow-100 text-yellow-800',
     }
     return colors[status] || colors.pending
@@ -151,6 +158,18 @@ export default function DraftDetailView({ draft }) {
                     </span>
                   </button>
                   <button
+                    onClick={handleSkip}
+                    disabled={approveMutation.isPending}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors font-medium"
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Skip (Already Handled)
+                    </span>
+                  </button>
+                  <button
                     onClick={handleReject}
                     disabled={approveMutation.isPending}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors font-medium"
@@ -188,6 +207,7 @@ export default function DraftDetailView({ draft }) {
               {draft.status === 'sent' && 'This draft has been sent'}
               {draft.status === 'approved' && 'This draft has been approved'}
               {draft.status === 'rejected' && 'This draft was rejected'}
+              {draft.status === 'skipped' && 'This draft was skipped (already handled manually)'}
             </div>
           )}
         </div>

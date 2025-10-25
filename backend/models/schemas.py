@@ -133,7 +133,7 @@ class DraftUpdate(BaseModel):
 
 class DraftApproval(BaseModel):
     """Schema for draft approval action"""
-    action: str = Field(..., pattern="^(approve|reject|edit|save)$")
+    action: str = Field(..., pattern="^(approve|reject|edit|save|skip)$")
     feedback: Optional[str] = None
     edited_content: Optional[str] = None
     edited_subject: Optional[str] = None

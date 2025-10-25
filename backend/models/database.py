@@ -203,7 +203,7 @@ class Draft(Base):
     lead = relationship("Lead", back_populates="drafts")
 
     __table_args__ = (
-        CheckConstraint("status IN ('pending', 'approved', 'rejected', 'sent', 'edited')", name='valid_draft_status'),
+        CheckConstraint("status IN ('pending', 'approved', 'rejected', 'sent', 'edited', 'skipped')", name='valid_draft_status'),
         CheckConstraint("customer_sentiment IS NULL OR customer_sentiment IN ('positive', 'neutral', 'negative')", name='valid_sentiment'),
     )
 

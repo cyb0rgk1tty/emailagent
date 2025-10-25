@@ -401,6 +401,7 @@ class ResponseAgentWrapper:
             Response generation prompt
         """
         product_types = lead_data.get('product_type') or []
+        specific_ingredients = lead_data.get('specific_ingredients') or []
         certifications = lead_data.get('certifications_requested') or []
         delivery_formats = lead_data.get('delivery_format') or []
         questions = lead_data.get('specific_questions') or []
@@ -409,6 +410,9 @@ class ResponseAgentWrapper:
 
 CONTEXT (DO NOT REPEAT IN EMAIL):
 The customer is interested in: {', '.join(product_types) if product_types else 'supplement manufacturing'}
+Specific formulation details: {', '.join(specific_ingredients) if specific_ingredients else 'not specified'}
+Certifications needed: {', '.join(certifications) if certifications else 'not specified'}
+Delivery format: {', '.join(delivery_formats) if delivery_formats else 'not specified'}
 They need quantity: {lead_data.get('estimated_quantity', 'unspecified')}
 Timeline: {lead_data.get('timeline_urgency', 'exploring')}
 
@@ -421,9 +425,18 @@ Learn from your historical responses to match your typical style, tone, and appr
 CRITICAL RULES - MUST FOLLOW:
 1. **DO NOT repeat back what the customer already told you**
 2. **DO NOT echo their requirements or specifications**
-3. **Assume they know what they asked for - move forward with value**
-4. Keep response under {settings.MAX_DRAFT_LENGTH} words (strictly enforced)
-5. Be direct and actionable - no fluff or preamble
+3. **ASK smart clarifying questions about unspecified important details:**
+   - If delivery format is "not specified" or "Unknown": Ask about format preferences (capsules, softgels, gummies, powders, liquids)
+   - If certifications are "not specified" or None AND relevant to the product: Ask if they need specific certifications (organic, GMP, kosher, etc.)
+   - DO NOT ask overly technical formulation questions (e.g., ubiquinol vs ubiquinone) - most customers won't know
+   - Limit to 1-2 high-value questions maximum, focusing on delivery format and certifications only
+4. **DON'T ask about information already specified in CONTEXT:**
+   - If they specified dosage (e.g., "300mg"), DON'T ask about dosage
+   - If they specified format (e.g., "capsules"), DON'T ask what format they want
+   - If they specified certifications, DON'T ask what certifications they need
+5. **Assume they know what they asked for - move forward with value**
+6. Keep response under {settings.MAX_DRAFT_LENGTH} words (strictly enforced)
+7. Be direct and actionable - no fluff or preamble
 
 EMAIL STRUCTURE (3 parts only):
 1. **Brief greeting** (1 sentence): "Hi [Name],"

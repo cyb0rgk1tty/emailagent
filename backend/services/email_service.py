@@ -13,6 +13,7 @@ from datetime import datetime
 import logging
 
 from config import get_settings
+from utils.email_utils import html_to_text
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -286,10 +287,8 @@ class EmailService:
                         charset = part.get_content_charset() or 'utf-8'
                         html_body = payload.decode(charset, errors='ignore')
 
-                        # Simple HTML to text conversion
-                        import re
-                        text_body = re.sub('<[^<]+?>', '', html_body)
-                        body = text_body
+                        # Proper HTML to text conversion with formatting preservation
+                        body = html_to_text(html_body)
                     except:
                         pass
         else:
