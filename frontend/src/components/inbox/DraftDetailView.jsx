@@ -24,10 +24,11 @@ export default function DraftDetailView({ draft }) {
   // Save edits mutation
   const saveEditsMutation = useMutation({
     mutationFn: () => draftsAPI.approve(draft.id, {
-      action: 'edit',
-      subject_line: editedSubject,
-      draft_content: editedContent,
-      edit_summary: editSummary,
+      action: 'save',
+      edited_subject: editedSubject,
+      edited_content: editedContent,
+      feedback: editSummary,
+      reviewed_by: 'user',
     }),
     onSuccess: () => {
       queryClient.invalidateQueries(['drafts'])
@@ -38,19 +39,19 @@ export default function DraftDetailView({ draft }) {
 
   const handleApprove = () => {
     if (confirm(`Send this email to ${draft.lead?.sender_email}?`)) {
-      approveMutation.mutate({ action: 'approve' })
+      approveMutation.mutate({ action: 'approve', reviewed_by: 'user' })
     }
   }
 
   const handleReject = () => {
     if (confirm('Reject this draft?')) {
-      approveMutation.mutate({ action: 'reject' })
+      approveMutation.mutate({ action: 'reject', reviewed_by: 'user' })
     }
   }
 
   const handleSkip = () => {
     if (confirm('Skip this draft? (Use this if you already replied manually)')) {
-      approveMutation.mutate({ action: 'skip' })
+      approveMutation.mutate({ action: 'skip', reviewed_by: 'user' })
     }
   }
 

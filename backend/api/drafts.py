@@ -10,6 +10,7 @@ from datetime import datetime
 from database import get_db
 from models.database import Draft, Lead
 from models.schemas import DraftCreate, DraftResponse, DraftUpdate, DraftApproval
+from tasks.email_tasks import send_approved_draft
 
 router = APIRouter()
 
@@ -139,7 +140,13 @@ async def approve_draft(
     db: AsyncSession = Depends(get_db)
 ):
     """Approve, reject, or edit a draft"""
-    result = await db.execute(select(Draft).where(Draft.id == draft_id))
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(Draft)
+        .options(selectinload(Draft.lead))
+        .where(Draft.id == draft_id)
+    )
     draft = result.scalar_one_or_none()
 
     if not draft:
@@ -148,14 +155,13 @@ async def approve_draft(
     draft.reviewed_by = approval.reviewed_by or "system"
     draft.reviewed_at = datetime.utcnow()
 
+    # Track if we need to queue email sending
+    should_send_email = False
+
     if approval.action == "approve":
         draft.status = "approved"
         draft.approved_at = datetime.utcnow()
-
-        # Queue email sending task
-        from tasks.email_tasks import send_approved_draft
-        await db.commit()
-        send_approved_draft.delay(draft_id)
+        should_send_email = True
 
     elif approval.action == "reject":
         draft.status = "rejected"
@@ -186,8 +192,14 @@ async def approve_draft(
         draft.customer_sentiment = approval.customer_sentiment
         draft.customer_replied = True
 
+    # Commit all changes and refresh draft
     await db.commit()
     await db.refresh(draft)
+
+    # Queue email sending task AFTER database session is closed
+    if should_send_email:
+        send_approved_draft.delay(draft_id)
+
     return draft
 
 

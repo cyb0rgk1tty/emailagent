@@ -706,4 +706,10 @@ def send_approved_draft(draft_id: int):
             logger.error(f"Error sending draft {draft_id}: {e}", exc_info=True)
             return {'status': 'error', 'error': str(e)}
 
-    return asyncio.run(_send())
+    # Create a new event loop for this task to avoid loop conflicts
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(_send())
+    finally:
+        loop.close()

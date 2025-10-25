@@ -141,9 +141,22 @@ class EmailService:
             Email data dictionary
         """
         try:
-            # Get sender
+            # Get sender - prefer Reply-To for contact forms, fallback to From
             from_header = email_message.get('From', '')
-            sender_name, sender_email = parseaddr(from_header)
+            sender_name, from_email = parseaddr(from_header)
+
+            # Check for Reply-To header (used by contact forms)
+            reply_to_header = email_message.get('Reply-To', '')
+            reply_to_name, reply_to_email = parseaddr(reply_to_header) if reply_to_header else ('', '')
+
+            # Use Reply-To if available, otherwise use From
+            if reply_to_email:
+                sender_email = reply_to_email
+                # Keep the name from Reply-To if available, otherwise use From name
+                if reply_to_name:
+                    sender_name = reply_to_name
+            else:
+                sender_email = from_email
 
             if not sender_email:
                 logger.warning("Email missing sender address")

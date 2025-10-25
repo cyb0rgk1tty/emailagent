@@ -20,10 +20,11 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
   // Save edits mutation
   const saveEditsMutation = useMutation({
     mutationFn: (data) => draftsAPI.approve(draft.id, {
-      action: 'edit',
-      subject_line: editedSubject,
-      draft_content: editedContent,
-      edit_summary: editSummary,
+      action: 'save',
+      edited_subject: editedSubject,
+      edited_content: editedContent,
+      feedback: editSummary,
+      reviewed_by: 'user',
     }),
     onSuccess: () => {
       setIsEditing(false)
@@ -33,13 +34,13 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
 
   const handleApprove = () => {
     if (confirm(`Send this email to ${draft.lead?.sender_email}?`)) {
-      approveMutation.mutate({ action: 'approve' })
+      approveMutation.mutate({ action: 'approve', reviewed_by: 'user' })
     }
   }
 
   const handleReject = () => {
     if (confirm('Reject this draft?')) {
-      approveMutation.mutate({ action: 'reject' })
+      approveMutation.mutate({ action: 'reject', reviewed_by: 'user' })
     }
   }
 
@@ -55,6 +56,7 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
     approveMutation.mutate({
       action: 'approve',
       customer_sentiment: sentiment,
+      reviewed_by: 'user',
     })
   }
 
