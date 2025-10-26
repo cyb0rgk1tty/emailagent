@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { draftsAPI } from '../services/api'
+import ConfirmModal from './ConfirmModal'
+import toast from 'react-hot-toast'
 
 export default function DraftReviewModal({ draft, onClose, onUpdate }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -8,6 +10,7 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
   const [editedContent, setEditedContent] = useState(draft.draft_content)
   const [editSummary, setEditSummary] = useState('')
   const [showFeedback, setShowFeedback] = useState(false)
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null })
 
   // Approve mutation
   const approveMutation = useMutation({
@@ -33,20 +36,26 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
   })
 
   const handleApprove = () => {
-    if (confirm(`Send this email to ${draft.lead?.sender_email}?`)) {
-      approveMutation.mutate({ action: 'approve', reviewed_by: 'user' })
-    }
+    setConfirmModal({ isOpen: true, type: 'approve' })
   }
 
   const handleReject = () => {
-    if (confirm('Reject this draft?')) {
-      approveMutation.mutate({ action: 'reject', reviewed_by: 'user' })
-    }
+    setConfirmModal({ isOpen: true, type: 'reject' })
+  }
+
+  const handleConfirmApprove = () => {
+    approveMutation.mutate({ action: 'approve', reviewed_by: 'user' })
+    setConfirmModal({ isOpen: false, type: null })
+  }
+
+  const handleConfirmReject = () => {
+    approveMutation.mutate({ action: 'reject', reviewed_by: 'user' })
+    setConfirmModal({ isOpen: false, type: null })
   }
 
   const handleSaveEdits = () => {
     if (!editSummary.trim()) {
-      alert('Please provide a summary of your edits')
+      toast.error('Please provide a summary of your edits')
       return
     }
     saveEditsMutation.mutate()
@@ -349,6 +358,31 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen && confirmModal.type === 'approve'}
+        onClose={() => setConfirmModal({ isOpen: false, type: null })}
+        onConfirm={handleConfirmApprove}
+        title="Send Email"
+        message={`Send this email to ${draft.lead?.sender_email}?`}
+        confirmText="Send Email"
+        cancelText="Cancel"
+        variant="success"
+        loading={approveMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen && confirmModal.type === 'reject'}
+        onClose={() => setConfirmModal({ isOpen: false, type: null })}
+        onConfirm={handleConfirmReject}
+        title="Reject Draft"
+        message="Are you sure you want to reject this draft? This action cannot be undone."
+        confirmText="Reject Draft"
+        cancelText="Cancel"
+        variant="danger"
+        loading={approveMutation.isPending}
+      />
     </div>
   )
 }

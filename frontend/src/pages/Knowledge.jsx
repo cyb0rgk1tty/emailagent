@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { knowledgeAPI } from '../services/api'
 import { Upload, RefreshCw, FileText, Database, Search, Trash2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import ConfirmModal from '../components/ConfirmModal'
 
 export default function Knowledge() {
   const queryClient = useQueryClient()
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showQueryModal, setShowQueryModal] = useState(false)
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, documentName: null })
 
   // Fetch knowledge base stats
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -49,15 +51,21 @@ export default function Knowledge() {
   const documents = documentsData?.data?.documents || []
 
   const handleReindex = () => {
-    if (confirm('Are you sure you want to re-index the entire knowledge base? This may take some time.')) {
-      reindexMutation.mutate()
-    }
+    setConfirmModal({ isOpen: true, type: 'reindex', documentName: null })
   }
 
   const handleDelete = (documentName) => {
-    if (confirm(`Are you sure you want to deactivate "${documentName}"? This will mark it as inactive.`)) {
-      deleteMutation.mutate(documentName)
-    }
+    setConfirmModal({ isOpen: true, type: 'delete', documentName })
+  }
+
+  const handleConfirmReindex = () => {
+    reindexMutation.mutate()
+    setConfirmModal({ isOpen: false, type: null, documentName: null })
+  }
+
+  const handleConfirmDelete = () => {
+    deleteMutation.mutate(confirmModal.documentName)
+    setConfirmModal({ isOpen: false, type: null, documentName: null })
   }
 
   return (
@@ -189,6 +197,31 @@ export default function Knowledge() {
           onClose={() => setShowQueryModal(false)}
         />
       )}
+
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen && confirmModal.type === 'reindex'}
+        onClose={() => setConfirmModal({ isOpen: false, type: null, documentName: null })}
+        onConfirm={handleConfirmReindex}
+        title="Re-index Knowledge Base"
+        message="Are you sure you want to re-index the entire knowledge base? This may take some time and will regenerate all embeddings."
+        confirmText="Re-index"
+        cancelText="Cancel"
+        variant="warning"
+        loading={reindexMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen && confirmModal.type === 'delete'}
+        onClose={() => setConfirmModal({ isOpen: false, type: null, documentName: null })}
+        onConfirm={handleConfirmDelete}
+        title="Deactivate Document"
+        message={`Are you sure you want to deactivate "${confirmModal.documentName}"? This will mark it as inactive and it won't be used in RAG queries.`}
+        confirmText="Deactivate"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }

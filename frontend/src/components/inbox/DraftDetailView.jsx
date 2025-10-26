@@ -4,6 +4,8 @@ import { draftsAPI } from '../../services/api'
 import ExtractedLeadDataSection from './ExtractedLeadDataSection'
 import OriginalInquirySection from './OriginalInquirySection'
 import DraftResponseSection from './DraftResponseSection'
+import ConfirmModal from '../ConfirmModal'
+import toast from 'react-hot-toast'
 
 export default function DraftDetailView({ draft }) {
   const queryClient = useQueryClient()
@@ -11,6 +13,7 @@ export default function DraftDetailView({ draft }) {
   const [editedSubject, setEditedSubject] = useState(draft.subject_line)
   const [editedContent, setEditedContent] = useState(draft.draft_content)
   const [editSummary, setEditSummary] = useState('')
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null })
 
   // Approve/Reject mutation
   const approveMutation = useMutation({
@@ -38,30 +41,46 @@ export default function DraftDetailView({ draft }) {
   })
 
   const handleApprove = () => {
-    if (confirm(`Send this email to ${draft.lead?.sender_email}?`)) {
-      approveMutation.mutate({ action: 'approve', reviewed_by: 'user' })
-    }
+    setConfirmModal({ isOpen: true, type: 'approve' })
   }
 
   const handleReject = () => {
-    if (confirm('Reject this draft?')) {
-      approveMutation.mutate({ action: 'reject', reviewed_by: 'user' })
-    }
+    setConfirmModal({ isOpen: true, type: 'reject' })
   }
 
   const handleSkip = () => {
-    if (confirm('Skip this draft? (Use this if you already replied manually)')) {
-      approveMutation.mutate({ action: 'skip', reviewed_by: 'user' })
-    }
+    setConfirmModal({ isOpen: true, type: 'skip' })
+  }
+
+  const handleConfirmApprove = () => {
+    approveMutation.mutate({ action: 'approve', reviewed_by: 'user' })
+    setConfirmModal({ isOpen: false, type: null })
+  }
+
+  const handleConfirmReject = () => {
+    approveMutation.mutate({ action: 'reject', reviewed_by: 'user' })
+    setConfirmModal({ isOpen: false, type: null })
+  }
+
+  const handleConfirmSkip = () => {
+    approveMutation.mutate({ action: 'skip', reviewed_by: 'user' })
+    setConfirmModal({ isOpen: false, type: null })
+  }
+
+  const handleConfirmDiscard = () => {
+    setIsEditMode(false)
+    setEditedSubject(draft.subject_line)
+    setEditedContent(draft.draft_content)
+    setEditSummary('')
+    setConfirmModal({ isOpen: false, type: null })
   }
 
   const handleEdit = () => {
     if (isEditMode) {
       // Cancel edit mode
       if (editedSubject !== draft.subject_line || editedContent !== draft.draft_content) {
-        if (!confirm('Discard unsaved changes?')) {
-          return
-        }
+        setConfirmModal({ isOpen: true, type: 'discard' })
+        return
       }
       setIsEditMode(false)
       setEditedSubject(draft.subject_line)
@@ -75,7 +94,7 @@ export default function DraftDetailView({ draft }) {
 
   const handleSaveEdits = () => {
     if (!editSummary.trim()) {
-      alert('Please provide a summary of your edits')
+      toast.error('Please provide a summary of your edits')
       return
     }
     saveEditsMutation.mutate()
@@ -251,6 +270,54 @@ export default function DraftDetailView({ draft }) {
           setEditSummary={setEditSummary}
         />
       </div>
+
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen && confirmModal.type === 'approve'}
+        onClose={() => setConfirmModal({ isOpen: false, type: null })}
+        onConfirm={handleConfirmApprove}
+        title="Send Email"
+        message={`Send this email to ${draft.lead?.sender_email}?`}
+        confirmText="Send Email"
+        cancelText="Cancel"
+        variant="success"
+        loading={approveMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen && confirmModal.type === 'reject'}
+        onClose={() => setConfirmModal({ isOpen: false, type: null })}
+        onConfirm={handleConfirmReject}
+        title="Reject Draft"
+        message="Are you sure you want to reject this draft? This action cannot be undone."
+        confirmText="Reject Draft"
+        cancelText="Cancel"
+        variant="danger"
+        loading={approveMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen && confirmModal.type === 'skip'}
+        onClose={() => setConfirmModal({ isOpen: false, type: null })}
+        onConfirm={handleConfirmSkip}
+        title="Skip Draft"
+        message="Skip this draft? Use this if you already replied manually to this inquiry."
+        confirmText="Skip Draft"
+        cancelText="Cancel"
+        variant="warning"
+        loading={approveMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen && confirmModal.type === 'discard'}
+        onClose={() => setConfirmModal({ isOpen: false, type: null })}
+        onConfirm={handleConfirmDiscard}
+        title="Discard Changes"
+        message="Are you sure you want to discard your unsaved changes?"
+        confirmText="Discard Changes"
+        cancelText="Keep Editing"
+        variant="warning"
+      />
     </div>
   )
 }

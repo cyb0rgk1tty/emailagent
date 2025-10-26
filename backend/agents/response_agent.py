@@ -433,8 +433,8 @@ CRITICAL RULES - MUST FOLLOW:
 1. **DO NOT repeat back what the customer already told you**
 2. **DO NOT echo their requirements or specifications**
 3. **ASK smart clarifying questions about unspecified important details:**
-   - If delivery format is "not specified" or "Unknown": Ask about format preferences (capsules, softgels, gummies, powders, liquids)
-   - If certifications are "not specified" or None AND relevant to the product: Ask if they need specific certifications (organic, GMP, kosher, etc.)
+   - If delivery format is "not specified" or "Unknown": Ask about format preferences (eh: tablets, capsules, softgels, gummies, powders)
+   - If certifications are "not specified" or None AND relevant to the product: Ask if they need specific certifications (organic, halal, vegan, etc.)
    - DO NOT ask overly technical formulation questions (e.g., ubiquinol vs ubiquinone) - most customers won't know
    - Limit to 1-2 high-value questions maximum, focusing on delivery format and certifications only
 4. **DON'T ask about information already specified in CONTEXT:**
@@ -479,7 +479,7 @@ EXAMPLE OF GOOD LENGTH (75-100 words):
 
 We can definitely help with your supplement project. We specialize in [relevant capability] and have worked with clients in [relevant market].
 
-To provide you with accurate timeline and pricing, we'd need to know [1-2 specific details you need]. Would you be available for a brief call with one of our co-founders this week?
+To provide you with accurate timeline and pricing, we'd need to know [1-2 specific details you need]. Would you be available for a brief call with one of our co-founders this week? If so, please leave your availability and i'll book you in.
 
 Best regards,
 
