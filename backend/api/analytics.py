@@ -3,7 +3,7 @@ Analytics API endpoints
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from typing import Optional
 from datetime import datetime, timedelta
 
@@ -105,15 +105,20 @@ async def get_analytics_overview(
     )
     leads_by_priority = {row[0]: row[1] for row in priority_result.all()}
 
-    # Leads by product type (simplified - just count first product type)
-    product_result = await db.execute(
-        select(Lead.product_type, func.count(Lead.id))
-        .where(Lead.received_at >= cutoff_date)
-        .where(Lead.product_type.isnot(None))
-        .group_by(Lead.product_type)
-    )
-    # This is simplified - would need more complex logic for array types
-    leads_by_product_type = {}
+    # Leads by product type (using unnest to expand arrays)
+    # PostgreSQL-specific query to count each product type from array columns
+    product_query = text("""
+        SELECT pt as product_type, COUNT(*) as count
+        FROM leads l, unnest(l.product_type) as pt
+        WHERE l.received_at >= :cutoff_date
+        AND l.lead_status != 'spam'
+        AND pt IS NOT NULL
+        GROUP BY pt
+        ORDER BY count DESC
+        LIMIT 10
+    """)
+    product_result = await db.execute(product_query, {"cutoff_date": cutoff_date})
+    leads_by_product_type = {row[0]: row[1] for row in product_result.all()}
 
     # Recent activity (last 10 items, excluding spam)
     recent_leads = await db.execute(
@@ -163,6 +168,42 @@ async def get_product_trends(
     trends = result.scalars().all()
 
     return {"trends": [ProductTypeTrendResponse.model_validate(t) for t in trends]}
+
+
+@router.get("/product-types")
+async def get_product_type_distribution(
+    days: int = Query(7, ge=1, le=3650),
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get product type distribution (top N product types by count)
+
+    Uses PostgreSQL unnest to properly handle array columns.
+    Excludes spam leads.
+    """
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    # PostgreSQL query to expand arrays and count occurrences
+    query = text("""
+        SELECT pt as product_type, COUNT(*) as count
+        FROM leads l, unnest(l.product_type) as pt
+        WHERE l.received_at >= :cutoff_date
+        AND l.lead_status != 'spam'
+        AND pt IS NOT NULL
+        GROUP BY pt
+        ORDER BY count DESC
+        LIMIT :limit
+    """)
+
+    result = await db.execute(query, {"cutoff_date": cutoff_date, "limit": limit})
+
+    product_types = [
+        {"name": row[0], "value": row[1]}
+        for row in result.all()
+    ]
+
+    return {"product_types": product_types}
 
 
 @router.get("/export/{format}")

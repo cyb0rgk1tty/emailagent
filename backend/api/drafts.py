@@ -192,9 +192,18 @@ async def approve_draft(
         draft.customer_sentiment = approval.customer_sentiment
         draft.customer_replied = True
 
-    # Commit all changes and refresh draft
+    # Commit all changes
     await db.commit()
-    await db.refresh(draft)
+
+    # Refresh draft with relationship loaded
+    await db.refresh(draft, attribute_names=['lead_id', 'status', 'reviewed_by', 'reviewed_at',
+                                              'approved_at', 'approval_feedback', 'edit_summary',
+                                              'customer_replied', 'customer_sentiment',
+                                              'draft_content', 'subject_line'])
+
+    # Ensure lead relationship is still accessible after refresh
+    # by accessing it within the session context
+    _ = draft.lead
 
     # Queue email sending task AFTER database session is closed
     if should_send_email:

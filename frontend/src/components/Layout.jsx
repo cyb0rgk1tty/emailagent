@@ -19,7 +19,7 @@ const Layout = () => {
             <div className="flex">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-primary-600">
+                <h1 className="text-xl font-bold text-emerald-400">
                   Nutricraft Labs
                 </h1>
               </div>

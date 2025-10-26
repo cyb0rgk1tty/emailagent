@@ -29,7 +29,13 @@ export default function Analytics() {
     queryFn: () => analyticsAPI.getProductTrends({ days: timeRange }),
   })
 
-  // Fetch all leads for additional metrics
+  // Fetch product type distribution from backend
+  const { data: productTypesData, isLoading: productTypesLoading } = useQuery({
+    queryKey: ['analytics', 'product-types', timeRange],
+    queryFn: () => analyticsAPI.getProductTypes({ days: timeRange, limit: 10 }),
+  })
+
+  // Fetch all leads for additional metrics (quality distribution, timeline)
   const { data: allLeads } = useQuery({
     queryKey: ['leads', 'all'],
     queryFn: () => leadsAPI.getAll({ limit: 1000 }),
@@ -37,6 +43,7 @@ export default function Analytics() {
 
   const analytics = overview?.data || {}
   const productTrends = trends?.data?.trends || []
+  const productTypeData = productTypesData?.data?.product_types || []
   const allLeadsData = allLeads?.data || []
 
   // Filter out spam leads from frontend calculations
@@ -49,20 +56,6 @@ export default function Analytics() {
     { name: 'Medium', value: analytics.leads_by_priority?.medium || 0, color: COLORS.medium },
     { name: 'Low', value: analytics.leads_by_priority?.low || 0, color: COLORS.low },
   ].filter(item => item.value > 0)
-
-  // Calculate product type distribution
-  const productTypeMap = {}
-  leads.forEach(lead => {
-    if (lead.product_type && Array.isArray(lead.product_type)) {
-      lead.product_type.forEach(product => {
-        productTypeMap[product] = (productTypeMap[product] || 0) + 1
-      })
-    }
-  })
-  const productTypeData = Object.entries(productTypeMap)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10)
 
   // Calculate quality score distribution
   const qualityDistribution = [
@@ -198,12 +191,28 @@ export default function Analytics() {
         <ChartCard title="Top 10 Product Types">
           {productTypeData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={productTypeData} layout="horizontal">
+              <BarChart data={productTypeData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={120} />
-                <Tooltip />
-                <Bar dataKey="value" fill={COLORS.success} />
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  interval={0}
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis
+                  label={{ value: 'Number of Leads', angle: -90, position: 'insideLeft' }}
+                />
+                <Tooltip
+                  formatter={(value) => [`${value} leads`, 'Count']}
+                  labelFormatter={(label) => `Product: ${label}`}
+                />
+                <Bar
+                  dataKey="value"
+                  fill={COLORS.success}
+                  radius={[8, 8, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           ) : (
