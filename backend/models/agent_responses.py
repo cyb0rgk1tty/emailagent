@@ -135,8 +135,9 @@ class LeadExtraction(BaseModel):
 class ResponseDraft(BaseModel):
     """Structured output from response agent"""
 
-    subject_line: str = Field(
-        description="Email subject line (Re: original subject)"
+    subject_line: Optional[str] = Field(
+        default=None,
+        description="Email subject line (optional - will be auto-generated if not provided)"
     )
     draft_content: str = Field(
         description="Full email draft content"
@@ -182,9 +183,11 @@ class ResponseDraft(BaseModel):
 
     @field_validator('subject_line')
     @classmethod
-    def validate_subject_line(cls, v: str) -> str:
+    def validate_subject_line(cls, v: Optional[str]) -> Optional[str]:
         """Validate subject line is not empty and has reasonable length"""
-        if not v or len(v.strip()) < 3:
+        if v is None:
+            return None
+        if len(v.strip()) < 3:
             raise ValueError("Subject line must be at least 3 characters")
         if len(v) > 200:
             raise ValueError("Subject line must be less than 200 characters")

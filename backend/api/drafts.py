@@ -214,16 +214,50 @@ async def approve_draft(
 
 @router.get("/stats/count")
 async def get_drafts_count(db: AsyncSession = Depends(get_db)):
-    """Get drafts count by status"""
-    total_result = await db.execute(select(func.count(Draft.id)))
+    """Get drafts count by status (for initial inquiries only, matching listing filters)"""
+
+    # Base filter: Only count drafts for initial inquiries (not replies)
+    base_filters = and_(
+        Lead.parent_lead_id.is_(None),  # Only initial inquiries
+        Lead.lead_status != 'customer_replied',  # Not a reply to our email
+        ~Lead.subject.ilike('Re:%')  # Exclude emails with "Re:" prefix
+    )
+
+    # Total drafts (initial inquiries only)
+    total_result = await db.execute(
+        select(func.count(Draft.id))
+        .join(Lead, Draft.lead_id == Lead.id)
+        .where(base_filters)
+    )
     total = total_result.scalar()
 
+    # Pending drafts
     pending_result = await db.execute(
-        select(func.count(Draft.id)).where(Draft.status == 'pending')
+        select(func.count(Draft.id))
+        .join(Lead, Draft.lead_id == Lead.id)
+        .where(and_(Draft.status == 'pending', base_filters))
     )
     pending = pending_result.scalar()
 
+    # Approved drafts (approved + sent)
+    approved_result = await db.execute(
+        select(func.count(Draft.id))
+        .join(Lead, Draft.lead_id == Lead.id)
+        .where(and_(or_(Draft.status == 'approved', Draft.status == 'sent'), base_filters))
+    )
+    approved = approved_result.scalar()
+
+    # Rejected drafts
+    rejected_result = await db.execute(
+        select(func.count(Draft.id))
+        .join(Lead, Draft.lead_id == Lead.id)
+        .where(and_(Draft.status == 'rejected', base_filters))
+    )
+    rejected = rejected_result.scalar()
+
     return {
         "total_drafts": total,
-        "pending_drafts": pending
+        "pending_drafts": pending,
+        "approved_drafts": approved,
+        "rejected_drafts": rejected
     }

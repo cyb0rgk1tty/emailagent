@@ -360,18 +360,79 @@ class EmailService:
             text_part = MIMEText(body, 'plain', 'utf-8')
             msg.attach(text_part)
 
-            # Connect and send
+            # Connect and send via SMTP
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.email_address, self.email_password)
                 server.send_message(msg)
 
             logger.info(f"Sent email to {to_email} (CC: {cc_recipients}): {subject}")
+
+            # Save to Sent folder via IMAP
+            try:
+                await self._save_to_sent_folder(msg)
+            except Exception as e:
+                # Don't fail the send operation if saving to Sent fails
+                logger.warning(f"Failed to save email to Sent folder: {e}")
+
             return True
 
         except Exception as e:
             logger.error(f"Error sending email to {to_email}: {e}", exc_info=True)
             return False
+
+    async def _save_to_sent_folder(self, msg: MIMEMultipart) -> None:
+        """Save sent email to Sent folder via IMAP APPEND
+
+        Args:
+            msg: Email message to save
+        """
+        if not self.imap_host or not self.email_address:
+            logger.warning("IMAP credentials not configured, skipping Sent folder save")
+            return
+
+        try:
+            # Connect to IMAP server
+            if self.imap_port == 993:
+                mail = imaplib.IMAP4_SSL(self.imap_host, self.imap_port)
+            else:
+                mail = imaplib.IMAP4(self.imap_host, self.imap_port)
+
+            # Login
+            mail.login(self.email_address, self.email_password)
+
+            # Add Date header if not present
+            from email.utils import formatdate
+            if 'Date' not in msg:
+                msg['Date'] = formatdate(localtime=True)
+
+            # Convert message to bytes
+            msg_bytes = msg.as_bytes()
+
+            # Append to Sent folder (try common folder names)
+            sent_folders = ['Sent', 'INBOX.Sent', '[Gmail]/Sent Mail', 'Sent Items']
+            saved = False
+
+            for folder in sent_folders:
+                try:
+                    status, _ = mail.append(folder, '\\Seen', None, msg_bytes)
+                    if status == 'OK':
+                        logger.info(f"Saved email to {folder} folder")
+                        saved = True
+                        break
+                except Exception as e:
+                    logger.debug(f"Failed to save to {folder}: {e}")
+                    continue
+
+            if not saved:
+                logger.warning("Could not find Sent folder to save email")
+
+            # Logout
+            mail.logout()
+
+        except Exception as e:
+            logger.error(f"Error saving to Sent folder: {e}")
+            raise
 
     async def test_connection(self) -> Dict[str, bool]:
         """Test IMAP and SMTP connections

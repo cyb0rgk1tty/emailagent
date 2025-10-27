@@ -122,6 +122,8 @@ def get_dynamic_system_prompt(lead_priority: str) -> str:
 
 Your role is to write personalized, professional email responses to potential clients.
 
+CRITICAL: You do NOT need to generate a subject line - it will be auto-generated. Only provide the email body content.
+
 IMPORTANT VOICE & POSITIONING:
 - When suggesting calls or meetings, make it clear the call will be with one of our co-founders or team members, not with you (Claire, the assistant). Use phrases like "one of our co-founders", "our team", or "our staff".
 - Use "we" instead of "I" when referring to company capabilities or information needs
@@ -334,9 +336,7 @@ async def validate_response_draft(ctx: RunContext[ResponseDeps], result: Respons
     if result.confidence_score < 0 or result.confidence_score > 10:
         raise ModelRetry("Confidence score must be between 0 and 10")
 
-    # Check subject line
-    if len(result.subject_line) < 5:
-        raise ModelRetry("Subject line must be at least 5 characters")
+    # Subject line check removed - subject is now generated programmatically, not by AI
 
     # Check draft content length (character count)
     if len(result.draft_content) < 100:
@@ -411,17 +411,37 @@ class ResponseAgentWrapper:
         specific_ingredients = lead_data.get('specific_ingredients') or []
         certifications = lead_data.get('certifications_requested') or []
         delivery_formats = lead_data.get('delivery_format') or []
-        questions = lead_data.get('specific_questions') or []
+        estimated_quantity = lead_data.get('estimated_quantity')
+        timeline = lead_data.get('timeline_urgency')
+
+        # Build dynamic context - only show fields that have actual values
+        context_parts = []
+
+        if product_types:
+            context_parts.append(f"Product type: {', '.join(product_types)}")
+
+        if specific_ingredients:
+            context_parts.append(f"Specific ingredients: {', '.join(specific_ingredients)}")
+
+        if delivery_formats:
+            context_parts.append(f"Delivery format: {', '.join(delivery_formats)}")
+
+        if certifications:
+            context_parts.append(f"Certifications requested: {', '.join(certifications)}")
+
+        if estimated_quantity:
+            context_parts.append(f"Quantity: {estimated_quantity}")
+
+        if timeline:
+            context_parts.append(f"Timeline: {timeline}")
+
+        # If no context available, provide a minimal note
+        context_text = "\n".join(context_parts) if context_parts else "The customer is inquiring about supplement manufacturing (details not specified)"
 
         prompt = f"""Write a concise, professional B2B email response to this inquiry from {lead_data.get('sender_name', 'Customer')}.
 
-CONTEXT (DO NOT REPEAT IN EMAIL):
-The customer is interested in: {', '.join(product_types) if product_types else 'supplement manufacturing'}
-Specific formulation details: {', '.join(specific_ingredients) if specific_ingredients else 'not specified'}
-Certifications needed: {', '.join(certifications) if certifications else 'not specified'}
-Delivery format: {', '.join(delivery_formats) if delivery_formats else 'not specified'}
-They need quantity: {lead_data.get('estimated_quantity', 'unspecified')}
-Timeline: {lead_data.get('timeline_urgency', 'exploring')}
+CONTEXT (What the customer told us):
+{context_text}
 
 IMPORTANT TOOLS TO USE:
 1. Use get_similar_past_responses() FIRST to see how YOU handled similar inquiries in the past
@@ -430,20 +450,22 @@ IMPORTANT TOOLS TO USE:
 Learn from your historical responses to match your typical style, tone, and approach.
 
 CRITICAL RULES - MUST FOLLOW:
-1. **DO NOT repeat back what the customer already told you**
-2. **DO NOT echo their requirements or specifications**
-3. **ASK smart clarifying questions about unspecified important details:**
-   - If delivery format is "not specified" or "Unknown": Ask about format preferences (eh: tablets, capsules, softgels, gummies, powders)
-   - If certifications are "not specified" or None AND relevant to the product: Ask if they need specific certifications (organic, halal, vegan, etc.)
-   - DO NOT ask overly technical formulation questions (e.g., ubiquinol vs ubiquinone) - most customers won't know
-   - Limit to 1-2 high-value questions maximum, focusing on delivery format and certifications only
-4. **DON'T ask about information already specified in CONTEXT:**
-   - If they specified dosage (e.g., "300mg"), DON'T ask about dosage
-   - If they specified format (e.g., "capsules"), DON'T ask what format they want
-   - If they specified certifications, DON'T ask what certifications they need
-5. **Assume they know what they asked for - move forward with value**
-6. Keep response under {settings.MAX_DRAFT_LENGTH} words (strictly enforced)
-7. Be direct and actionable - no fluff or preamble
+1. **DO NOT repeat back what the customer already told you** - Use the CONTEXT to understand their needs, but don't echo it back
+2. **ASK smart clarifying questions ONLY about critical missing details:**
+   - If delivery format is missing: Ask about format preferences (tablets, capsules, softgels, gummies, powders)
+   - If quantity is missing: Ask about estimated order size
+   - If timeline is missing: Ask about launch timeline
+   - **DO NOT ask about certifications** unless they mentioned certifications in their inquiry
+   - DO NOT ask overly technical formulation questions - most customers won't know
+   - Limit to 1-2 high-value questions maximum
+3. **DON'T ask about information already in CONTEXT:**
+   - If they specified format, DON'T ask what format they want
+   - If they specified quantity, DON'T ask about quantity
+   - If they specified timeline, DON'T ask about timeline
+   - If they specified certifications, DON'T ask which certifications again
+4. **Assume they know what they asked for - move forward with value**
+5. Keep response under {settings.MAX_DRAFT_LENGTH} words (strictly enforced)
+6. Be direct and actionable - no fluff or preamble
 
 EMAIL STRUCTURE (3 parts only):
 1. **Brief greeting** (1 sentence): "Hi [Name],"
@@ -523,9 +545,13 @@ claire@nutricraftlabs.com"
             # Convert to dictionary for compatibility
             draft_data = result.output.model_dump()
 
+            # ALWAYS generate subject line programmatically (don't trust AI)
+            draft_data['subject_line'] = self._generate_subject_line(lead_data)
+
             logger.info(
                 f"Generated draft for {lead_data.get('sender_email')}: "
-                f"confidence={draft_data['confidence_score']:.1f}, type={draft_data['response_type']}"
+                f"confidence={draft_data['confidence_score']:.1f}, type={draft_data['response_type']}, "
+                f"subject={draft_data['subject_line']}"
             )
 
             return draft_data

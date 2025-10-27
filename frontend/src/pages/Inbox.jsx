@@ -20,6 +20,13 @@ export default function Inbox() {
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   })
 
+  // Fetch draft stats (independent of filter)
+  const { data: stats } = useQuery({
+    queryKey: ['draft-stats'],
+    queryFn: () => draftsAPI.getCount(),
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+  })
+
   const draftsList = Array.isArray(drafts?.data) ? drafts.data : (Array.isArray(drafts) ? drafts : [])
 
   // Get selected draft
@@ -143,6 +150,7 @@ export default function Inbox() {
       `}>
         <DraftListSidebar
           drafts={draftsList}
+          stats={stats?.data || stats}
           isLoading={isLoading}
           error={error}
           selectedDraftId={selectedDraftId}

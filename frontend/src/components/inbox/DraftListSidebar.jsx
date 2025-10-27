@@ -3,6 +3,7 @@ import DraftListItem from './DraftListItem'
 
 export default function DraftListSidebar({
   drafts,
+  stats,
   isLoading,
   error,
   selectedDraftId,
@@ -24,10 +25,10 @@ export default function DraftListSidebar({
     )
   })
 
-  // Get counts for each status
-  const pendingCount = drafts.filter(d => d.status === 'pending').length
-  const approvedCount = drafts.filter(d => d.status === 'approved' || d.status === 'sent').length
-  const rejectedCount = drafts.filter(d => d.status === 'rejected').length
+  // Get counts from stats (independent of current filter) - defaults to 0 if stats not loaded
+  const pendingCount = stats?.pending_drafts || 0
+  const approvedCount = stats?.approved_drafts || 0
+  const rejectedCount = stats?.rejected_drafts || 0
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
