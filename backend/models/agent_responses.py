@@ -53,6 +53,10 @@ class LeadExtraction(BaseModel):
         default=None,
         description="Whether they have an existing brand"
     )
+    has_approved_npn: Optional[bool] = Field(
+        default=None,
+        description="Whether lead mentioned having an approved or active NPN (Natural Product Number)"
+    )
 
     # Additional Context
     specific_questions: Optional[list[str]] = Field(

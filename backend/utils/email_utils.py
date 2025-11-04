@@ -132,3 +132,58 @@ def add_line_breaks_to_plain_text(text: str) -> str:
     text = re.sub(r' +\n', '\n', text)
 
     return text.strip()
+
+
+def extract_first_name(full_name: str) -> str:
+    """
+    Extract the first name from a full name string.
+
+    This function:
+    - Handles None and empty strings
+    - Removes common titles (Dr., Mr., Mrs., Ms., Prof., etc.)
+    - Extracts the first word as the first name
+    - Returns a sensible fallback if no name is found
+
+    Args:
+        full_name: Full name string (e.g., "John Smith", "Dr. Jane Doe")
+
+    Returns:
+        First name only (e.g., "John", "Jane") or "there" if unable to extract
+
+    Examples:
+        >>> extract_first_name("John Smith")
+        "John"
+        >>> extract_first_name("Dr. Jane Doe")
+        "Jane"
+        >>> extract_first_name("Mary")
+        "Mary"
+        >>> extract_first_name("")
+        "there"
+    """
+    if not full_name or not isinstance(full_name, str):
+        return "there"
+
+    # Strip and clean the name
+    name = full_name.strip()
+
+    if not name:
+        return "there"
+
+    # Remove common titles (case-insensitive)
+    titles = ['dr.', 'dr', 'mr.', 'mr', 'mrs.', 'mrs', 'ms.', 'ms', 'prof.', 'prof', 'professor']
+    words = name.split()
+
+    # Filter out titles
+    filtered_words = [word for word in words if word.lower() not in titles]
+
+    if not filtered_words:
+        return "there"
+
+    # Return the first word (first name)
+    first_name = filtered_words[0]
+
+    # Capitalize properly (handle all caps or all lowercase)
+    if first_name.isupper() or first_name.islower():
+        first_name = first_name.capitalize()
+
+    return first_name

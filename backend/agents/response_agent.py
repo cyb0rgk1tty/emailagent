@@ -15,6 +15,7 @@ from rag import get_semantic_search
 from rag.historical_response_retrieval import get_historical_response_retrieval
 from services.response_learning import get_response_style_analyzer
 from config import get_settings
+from utils.email_utils import extract_first_name
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -368,9 +369,19 @@ async def validate_response_draft(ctx: RunContext[ResponseDeps], result: Respons
     if emoji_pattern.search(result.draft_content):
         raise ModelRetry("Do not use emojis in professional email drafts.")
 
-    # Check that draft includes proper email format
+    # Check that draft includes proper email format with first name
     if not any(greeting in result.draft_content.lower() for greeting in ['dear', 'hello', 'hi', 'greetings']):
         raise ModelRetry("Draft must include a proper greeting")
+
+    # Validate that the first name is used in the greeting (first 150 characters)
+    sender_name = ctx.deps.lead_data.get('sender_name', '')
+    if sender_name:
+        first_name = extract_first_name(sender_name)
+        greeting_section = result.draft_content[:150].lower()
+
+        # Check if the first name appears in the greeting section
+        if first_name.lower() not in greeting_section:
+            raise ModelRetry(f"Draft must start with a greeting using the recipient's first name: 'Hi {first_name},' (not their full name or a generic greeting)")
 
     # Check for signature
     if 'nutricraftlabs.com' not in result.draft_content.lower() and 'nutricraft labs' not in result.draft_content.lower():
@@ -429,6 +440,11 @@ class ResponseAgentWrapper:
         if certifications:
             context_parts.append(f"Certifications requested: {', '.join(certifications)}")
 
+        # Check if they mentioned having an approved NPN
+        has_approved_npn = lead_data.get('has_approved_npn')
+        if has_approved_npn:
+            context_parts.append("Lead mentioned having an approved or active NPN")
+
         if estimated_quantity:
             context_parts.append(f"Quantity: {estimated_quantity}")
 
@@ -438,7 +454,11 @@ class ResponseAgentWrapper:
         # If no context available, provide a minimal note
         context_text = "\n".join(context_parts) if context_parts else "The customer is inquiring about supplement manufacturing (details not specified)"
 
-        prompt = f"""Write a concise, professional B2B email response to this inquiry from {lead_data.get('sender_name', 'Customer')}.
+        # Extract first name for personalized greeting
+        sender_name = lead_data.get('sender_name', '')
+        first_name = extract_first_name(sender_name)
+
+        prompt = f"""Write a concise, professional B2B email response to this inquiry from {sender_name or 'Customer'}.
 
 CONTEXT (What the customer told us):
 {context_text}
@@ -455,6 +475,7 @@ CRITICAL RULES - MUST FOLLOW:
    - If delivery format is missing: Ask about format preferences (tablets, capsules, softgels, gummies, powders)
    - If quantity is missing: Ask about estimated order size
    - If timeline is missing: Ask about launch timeline
+   - If they mention having an approved or active NPN: Ask for the specific NPN number so we can verify it
    - **DO NOT ask about certifications** unless they mentioned certifications in their inquiry
    - DO NOT ask overly technical formulation questions - most customers won't know
    - Limit to 1-2 high-value questions maximum
@@ -468,7 +489,7 @@ CRITICAL RULES - MUST FOLLOW:
 6. Be direct and actionable - no fluff or preamble
 
 EMAIL STRUCTURE (3 parts only):
-1. **Brief greeting** (1 sentence): "Hi [Name],"
+1. **Brief greeting** (1 sentence): "Hi {first_name}," - MUST use ONLY their first name ({first_name})
 2. **Value + Next steps** (2-3 sentences):
    - Brief capability statement relevant to their needs
    - What you need from them OR suggest a call
@@ -497,7 +518,7 @@ SIGNATURE:
 - IMPORTANT: Add a blank line between "Best regards," and your name
 
 EXAMPLE OF GOOD LENGTH (75-100 words):
-"Hi [Name],
+"Hi {first_name},
 
 We can definitely help with your supplement project. We specialize in [relevant capability] and have worked with clients in [relevant market].
 
@@ -588,12 +609,13 @@ claire@nutricraftlabs.com"
         """
         logger.warning("Using fallback response generation")
 
-        sender_name = lead_data.get('sender_name', 'there')
+        sender_name = lead_data.get('sender_name', '')
+        first_name = extract_first_name(sender_name)
         products = lead_data.get('product_type', [])
 
         product_mention = f"{products[0]} supplements" if products else "supplement products"
 
-        content = f"""Dear {sender_name},
+        content = f"""Hi {first_name},
 
 Thank you for reaching out to {EMAIL_SIGNATURE['company']} regarding {product_mention}.
 

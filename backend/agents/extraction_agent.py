@@ -45,7 +45,8 @@ Extract the following lead information from emails that are already structured:
 Extract other information that will be provided in Project Details (free form text) by the lead:
 - Product types the client is interested in - BE SPECIFIC! Extract the EXACT supplement type mentioned (e.g., "probiotics", "electrolytes", "creatine", "protein powder", "multivitamins", "omega-3", "collagen", "pre-workout", "greens", "ashwagandha", "vitamin-d", etc.). NEVER use generic terms like "supplements" or "dietary-supplements". If they mention multiple specific products, list each one separately. If no specific product is mentioned, use "Unknown".
 - Dosage forms the client is interested in (eg: tablets, capsules, gummies, powders, etc.). Use "Unknown" if not specified.
-- Product requirements such as certifications, or specific ingredients (eg: halal or vegan products only, plant based only, etc.). Use "Unknown" if not specified.
+- Product requirements such as certifications, specific ingredients, or regulatory approvals (eg: halal or vegan products only, plant based only, approved NPN, active NPN, etc.). Use "Unknown" if not specified.
+- Whether they mention having an approved or active NPN (Natural Product Number) - detect keywords like "approved NPN", "active NPN", "have an NPN", "NPN approved".
 
 Extract other importation business intelligence if needed.
 
@@ -204,10 +205,11 @@ Extract:
 1. Product types - BE SPECIFIC! Extract exact supplement names (e.g., "probiotics", "collagen", "omega-3") NOT generic terms like "supplements"
 2. Specific ingredients mentioned
 3. Delivery formats and certifications requested
-4. Business intelligence (quantity, timeline, budget, experience)
-5. Distribution channels and geographic region
-6. Lead quality score (1-10) and response priority
-7. Confidence in extraction accuracy (0-1)
+4. Whether they mention having an approved or active NPN (Natural Product Number)
+5. Business intelligence (quantity, timeline, budget, experience)
+6. Distribution channels and geographic region
+7. Lead quality score (1-10) and response priority
+8. Confidence in extraction accuracy (0-1)
 
 Use the search_knowledge_base tool to validate product types and certifications.
 Use the validate_product_type tool to check if product types are supported.

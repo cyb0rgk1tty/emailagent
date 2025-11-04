@@ -265,8 +265,43 @@ def process_email(email_data: Dict):
             }
 
         # Step 3: Generate response
+        # Query the Lead to get complete data (email metadata + extracted fields)
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Lead).where(Lead.id == lead_id)
+            )
+            lead = result.scalar_one()
+
+            # Build complete lead_data dict with both email metadata and extracted fields
+            lead_data = {
+                # Email metadata
+                'subject': lead.subject,
+                'sender_email': lead.sender_email,
+                'sender_name': lead.sender_name,
+                'body': lead.body,
+                'message_id': lead.message_id,
+                'received_at': lead.received_at,
+
+                # Extracted business intelligence
+                'product_type': lead.product_type,
+                'specific_ingredients': lead.specific_ingredients,
+                'delivery_format': lead.delivery_format,
+                'certifications_requested': lead.certifications_requested,
+                'estimated_quantity': lead.estimated_quantity,
+                'timeline_urgency': lead.timeline_urgency,
+                'budget_indicator': lead.budget_indicator,
+                'experience_level': lead.experience_level,
+                'distribution_channel': lead.distribution_channel,
+                'has_existing_brand': lead.has_existing_brand,
+                'specific_questions': lead.specific_questions,
+                'geographic_region': lead.geographic_region,
+                'lead_quality_score': lead.lead_quality_score,
+                'response_priority': lead.response_priority,
+                'extraction_confidence': lead.extraction_confidence,
+            }
+
         response_agent = get_response_agent()
-        draft_data = await response_agent.generate_response(extracted_data)
+        draft_data = await response_agent.generate_response(lead_data)
 
         if not draft_data:
             logger.error(f"Failed to generate response for lead {lead_id}")
