@@ -562,148 +562,192 @@ def process_email(email_data: Dict):
     return asyncio.run(_process())
 
 
+def _build_email_with_quote(
+    response_body: str,
+    original_subject: str,
+    original_body: str,
+    original_sender_name: str,
+    original_sender_email: str,
+    original_date
+) -> str:
+    """Build email body with quoted original message
+
+    Args:
+        response_body: The AI-generated response
+        original_subject: Original email subject
+        original_body: Original email body
+        original_sender_name: Original sender name
+        original_sender_email: Original sender email
+        original_date: Original email timestamp
+
+    Returns:
+        Formatted email body with quote
+    """
+    from datetime import datetime
+
+    # Format date in readable format
+    if isinstance(original_date, datetime):
+        date_str = original_date.strftime("%B %d, %Y at %I:%M %p")
+    else:
+        date_str = str(original_date)
+
+    # Build quote header
+    quote_header = f"\n\n---\n\nOn {date_str}, {original_sender_name} <{original_sender_email}> wrote:\n\n"
+
+    # Quote original body (add "> " prefix to each line)
+    quoted_lines = []
+    for line in original_body.split('\n'):
+        quoted_lines.append(f"> {line}")
+    quoted_body = '\n'.join(quoted_lines)
+
+    # Combine response + quote
+    full_body = response_body + quote_header + quoted_body
+
+    return full_body
+
+
 @celery_app.task(name='tasks.email_tasks.send_approved_draft')
 def send_approved_draft(draft_id: int):
-    """Send an approved draft via SMTP
+    """Send an approved draft via SMTP (synchronous for Celery)
 
     Args:
         draft_id: Draft ID to send
     """
-    import asyncio
+    from database import SyncSessionLocal
+    from sqlalchemy import select
+    import uuid
 
-    async def _send():
-        logger.info(f"Sending approved draft {draft_id}")
+    logger.info(f"Sending approved draft {draft_id}")
 
-        try:
-            email_service = get_email_service()
+    try:
+        email_service = get_email_service()
 
-            # Get draft and lead from database
-            async with get_db_session() as session:
-                from sqlalchemy import select
-                result = await session.execute(
+        # Step 1: Get draft and lead data from database
+        with SyncSessionLocal() as session:
+            result = session.execute(
+                select(Draft).where(Draft.id == draft_id)
+            )
+            draft = result.scalar_one_or_none()
+
+            if not draft:
+                return {'status': 'error', 'reason': 'draft_not_found'}
+
+            if draft.status != 'approved':
+                return {'status': 'error', 'reason': 'draft_not_approved'}
+
+            # Get associated lead
+            result = session.execute(
+                select(Lead).where(Lead.id == draft.lead_id)
+            )
+            lead = result.scalar_one_or_none()
+
+            if not lead:
+                return {'status': 'error', 'reason': 'lead_not_found'}
+
+            # Extract all data we need
+            lead_id = lead.id
+            lead_conversation_id = lead.conversation_id
+            lead_sender_email = lead.sender_email
+            lead_sender_name = lead.sender_name
+            lead_message_id = lead.message_id
+            lead_subject = lead.subject
+            lead_body = lead.body
+            lead_received_at = lead.received_at
+
+            draft_content = draft.draft_content
+            draft_subject_line = draft.subject_line
+            draft_edit_summary = draft.edit_summary
+            draft_confidence_score = draft.confidence_score
+
+        # Step 2: Build email and send (outside session context)
+        email_body_with_quote = _build_email_with_quote(
+            response_body=draft_content,
+            original_subject=lead_subject,
+            original_body=lead_body,
+            original_sender_name=lead_sender_name or "Customer",
+            original_sender_email=lead_sender_email,
+            original_date=lead_received_at
+        )
+
+        # Send email (synchronous)
+        success = email_service.send_email_sync(
+            to_email=lead_sender_email,
+            to_name=lead_sender_name,
+            subject=draft_subject_line,
+            body=email_body_with_quote,
+            in_reply_to=lead_message_id
+        )
+
+        # Step 3: Update database after successful send
+        if success:
+            with SyncSessionLocal() as update_session:
+                # Get the draft and lead again in the new session
+                result = update_session.execute(
                     select(Draft).where(Draft.id == draft_id)
                 )
                 draft = result.scalar_one_or_none()
 
-                if not draft:
-                    return {'status': 'error', 'reason': 'draft_not_found'}
-
-                if draft.status != 'approved':
-                    return {'status': 'error', 'reason': 'draft_not_approved'}
-
-                # Get associated lead
-                result = await session.execute(
-                    select(Lead).where(Lead.id == draft.lead_id)
+                result = update_session.execute(
+                    select(Lead).where(Lead.id == lead_id)
                 )
                 lead = result.scalar_one_or_none()
 
-                if not lead:
-                    return {'status': 'error', 'reason': 'lead_not_found'}
+                # Update draft status
+                draft.status = 'sent'
+                draft.sent_at = datetime.utcnow()
 
-                # Send email
-                success = await email_service.send_email(
-                    to_email=lead.sender_email,
-                    to_name=lead.sender_name,
-                    subject=draft.subject_line,
-                    body=draft.draft_content,
-                    in_reply_to=lead.message_id
-                )
+                # Create outbound email message record
+                if lead_conversation_id:
+                    sent_message_id = f"<{uuid.uuid4()}@emailagent.local>"
 
-                if success:
-                    # Update draft status
-                    draft.status = 'sent'
-                    draft.sent_at = datetime.utcnow()
+                    email_message = EmailMessage(
+                        message_id=sent_message_id,
+                        conversation_id=lead_conversation_id,
+                        lead_id=lead_id,
+                        direction='outbound',
+                        message_type='email',
+                        email_headers={
+                            'in_reply_to': lead_message_id,
+                            'references': lead_message_id
+                        },
+                        sender_email=email_service.email_address,
+                        sender_name='Sales Team',
+                        recipient_email=lead_sender_email,
+                        recipient_name=lead_sender_name,
+                        subject=draft_subject_line,
+                        body=email_body_with_quote,
+                        is_draft_sent=True,
+                        draft_id=draft_id,
+                        sent_at=datetime.utcnow()
+                    )
+                    update_session.add(email_message)
 
-                    # Create outbound email message record
-                    if lead.conversation_id:
-                        # Generate a message ID for our sent email
-                        import uuid
-                        sent_message_id = f"<{uuid.uuid4()}@emailagent.local>"
+                    # Update conversation
+                    result = update_session.execute(
+                        select(Conversation).where(Conversation.id == lead_conversation_id)
+                    )
+                    conversation = result.scalar_one_or_none()
+                    if conversation:
+                        conversation.last_message_id = sent_message_id
+                        conversation.last_activity_at = datetime.utcnow()
 
-                        email_message = EmailMessage(
-                            message_id=sent_message_id,
-                            conversation_id=lead.conversation_id,
-                            lead_id=lead.id,
-                            direction='outbound',
-                            message_type='email',
-                            email_headers={
-                                'in_reply_to': lead.message_id,
-                                'references': lead.message_id
-                            },
-                            sender_email=email_service.email_address,
-                            sender_name='Sales Team',
-                            recipient_email=lead.sender_email,
-                            recipient_name=lead.sender_name,
-                            subject=draft.subject_line,
-                            body=draft.draft_content,
-                            is_draft_sent=True,
-                            draft_id=draft_id,
-                            sent_at=datetime.utcnow()
-                        )
-                        session.add(email_message)
+                # Skip embedding generation for edited drafts (async operation)
+                # This can be done by a separate async task if needed
+                if draft_edit_summary:
+                    logger.info(f"📚 Draft {draft_id} was edited - skipping embedding generation in sync task")
 
-                        # Update conversation
-                        result = await session.execute(
-                            select(Conversation).where(Conversation.id == lead.conversation_id)
-                        )
-                        conversation = result.scalar_one_or_none()
-                        if conversation:
-                            conversation.last_message_id = sent_message_id
-                            conversation.last_activity_at = datetime.utcnow()
+                update_session.commit()
 
-                    # Capture edited drafts as training data for AI learning
-                    if draft.edit_summary:
-                        from models.database import HistoricalResponseExample
-                        from rag.embeddings import get_embedding_generator
+            logger.info(f"✅ Sent draft {draft_id} to {lead_sender_email}")
 
-                        logger.info(f"📚 Capturing edited draft {draft_id} as training example")
+            return {
+                'status': 'success',
+                'draft_id': draft_id,
+                'recipient': lead_sender_email
+            }
+        else:
+            return {'status': 'error', 'reason': 'smtp_send_failed'}
 
-                        try:
-                            # Build inquiry text for embedding
-                            inquiry_text = f"{lead.subject}\n\n{lead.body}" if lead.subject and lead.body else (lead.body or lead.subject or "")
-
-                            # Generate embedding for semantic search
-                            embedder = get_embedding_generator()
-                            inquiry_embedding = await embedder.generate_query_embedding(inquiry_text)
-
-                            # Create historical example with edited response
-                            historical_example = HistoricalResponseExample(
-                                inquiry_lead_id=lead.id,
-                                inquiry_subject=lead.subject,
-                                inquiry_body=lead.body,
-                                inquiry_sender_email=lead.sender_email,
-                                response_body=draft.draft_content,  # Edited version
-                                response_subject=draft.subject_line,
-                                response_date=datetime.utcnow(),
-                                embedding=inquiry_embedding,
-                                response_metadata={
-                                    'was_edited': True,
-                                    'edit_summary': draft.edit_summary,
-                                    'original_confidence': draft.confidence_score,
-                                    'source': 'edited_draft',
-                                    'draft_id': draft_id
-                                }
-                            )
-                            session.add(historical_example)
-                            logger.info(f"✅ Saved edited draft as historical example for future learning")
-                        except Exception as e:
-                            logger.error(f"⚠️ Failed to capture edited draft as training data: {e}")
-                            # Don't fail the whole send operation if training capture fails
-
-                    await session.commit()
-
-                    logger.info(f"✅ Sent draft {draft_id} to {lead.sender_email}")
-
-                    return {
-                        'status': 'success',
-                        'draft_id': draft_id,
-                        'recipient': lead.sender_email
-                    }
-                else:
-                    return {'status': 'error', 'reason': 'smtp_send_failed'}
-
-        except Exception as e:
-            logger.error(f"Error sending draft {draft_id}: {e}", exc_info=True)
-            return {'status': 'error', 'error': str(e)}
-
-    return asyncio.run(_send())
+    except Exception as e:
+        logger.error(f"Error sending draft {draft_id}: {e}", exc_info=True)
+        return {'status': 'error', 'error': str(e)}

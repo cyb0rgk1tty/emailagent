@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { draftsAPI } from '../services/api'
+import { draftsAPI, emailsAPI } from '../services/api'
 import DraftListSidebar from '../components/inbox/DraftListSidebar'
 import DraftDetailView from '../components/inbox/DraftDetailView'
 import EmptyState from '../components/inbox/EmptyState'
@@ -26,6 +26,21 @@ export default function Inbox() {
     queryFn: () => draftsAPI.getCount(),
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   })
+
+  // Trigger email check on page mount/refresh
+  useEffect(() => {
+    const triggerEmailCheck = async () => {
+      try {
+        await emailsAPI.triggerCheck()
+        // Silent success - no UI feedback needed
+      } catch (error) {
+        // Silent failure - don't disrupt user experience
+        console.debug('Email check trigger failed (non-critical):', error)
+      }
+    }
+
+    triggerEmailCheck()
+  }, []) // Empty dependency array = run once on mount
 
   const draftsList = Array.isArray(drafts?.data) ? drafts.data : (Array.isArray(drafts) ? drafts : [])
 

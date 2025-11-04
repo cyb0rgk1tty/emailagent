@@ -33,10 +33,14 @@ async def get_drafts(
     )
 
     if status:
-        query = query.where(Draft.status == status)
+        # For approved status, include both 'approved' and 'sent' drafts
+        if status == 'approved':
+            query = query.where(or_(Draft.status == 'approved', Draft.status == 'sent'))
+        else:
+            query = query.where(Draft.status == status)
 
-        # For pending status, only show initial inquiries
-        if status == 'pending':
+        # For pending and approved status, only show initial inquiries
+        if status in ['pending', 'approved']:
             query = query.where(
                 Lead.parent_lead_id.is_(None),  # Only initial inquiries
                 Lead.lead_status != 'customer_replied',  # Not a reply to our email

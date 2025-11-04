@@ -86,4 +86,8 @@ export const conversationsAPI = {
   getAll: (params) => api.get('/conversations', { params }),
 }
 
+export const emailsAPI = {
+  triggerCheck: () => api.post('/emails/check'),
+}
+
 export default api

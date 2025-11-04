@@ -3,13 +3,14 @@ Database connection and session management
 Uses async SQLAlchemy with PostgreSQL
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from config import settings
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Create async engine
+# Create async engine (for FastAPI endpoints)
 engine = create_async_engine(
     settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
     echo=settings.DEBUG,
@@ -23,6 +24,25 @@ engine = create_async_engine(
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+# Create synchronous engine (for Celery tasks)
+sync_engine = create_engine(
+    settings.DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://"),
+    echo=settings.DEBUG,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=3600,
+)
+
+# Create synchronous session factory (for Celery tasks)
+SyncSessionLocal = sessionmaker(
+    bind=sync_engine,
+    class_=Session,
     expire_on_commit=False,
     autocommit=False,
     autoflush=False,
@@ -74,3 +94,14 @@ def get_db_session():
             await session.execute(...)
     """
     return AsyncSessionLocal()
+
+
+def get_sync_db_session():
+    """
+    Get synchronous database session context manager (for Celery tasks)
+    Usage:
+        with get_sync_db_session() as session:
+            # Use session
+            session.execute(...)
+    """
+    return SyncSessionLocal()

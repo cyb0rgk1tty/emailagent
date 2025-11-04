@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import DraftListItem from './DraftListItem'
+import { emailsAPI } from '../../services/api'
 
 export default function DraftListSidebar({
   drafts,
@@ -12,6 +13,24 @@ export default function DraftListSidebar({
   onFilterChange,
 }) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshMessage, setRefreshMessage] = useState('')
+
+  // Handle manual email refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    setRefreshMessage('')
+    try {
+      await emailsAPI.triggerCheck()
+      setRefreshMessage('Checking for new emails...')
+      setTimeout(() => setRefreshMessage(''), 3000)
+    } catch (error) {
+      setRefreshMessage('Failed to trigger email check')
+      setTimeout(() => setRefreshMessage(''), 3000)
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 1000)
+    }
+  }
 
   // Filter drafts by search query
   const filteredDrafts = drafts.filter((draft) => {
@@ -34,7 +53,36 @@ export default function DraftListSidebar({
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
       {/* Header with Stats */}
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Inbox</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Inbox</h2>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Check for new emails"
+          >
+            <svg
+              className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Refresh feedback message */}
+        {refreshMessage && (
+          <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+            {refreshMessage}
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-3 mb-5">
@@ -137,12 +185,34 @@ export default function DraftListSidebar({
 
         {!isLoading && !error && filteredDrafts.length === 0 && (
           <div className="p-8 text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mb-4">
               {searchQuery ? 'No drafts match your search' : `No ${statusFilter} drafts found`}
             </p>
+            {!searchQuery && (
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg
+                  className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                {isRefreshing ? 'Checking...' : 'Check for New Emails'}
+              </button>
+            )}
           </div>
         )}
 
