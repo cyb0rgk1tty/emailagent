@@ -1,9 +1,29 @@
 """
 Pydantic models for request/response validation
 """
+from enum import Enum
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+
+
+class DraftStatus(str, Enum):
+    """Draft status values"""
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EDITED = "edited"
+    SKIPPED = "skipped"
+    SENT = "sent"
+
+
+class LeadStatus(str, Enum):
+    """Lead status values"""
+    NEW = "new"
+    RESPONDED = "responded"
+    CUSTOMER_REPLIED = "customer_replied"
+    CLOSED = "closed"
+    SPAM = "spam"
 
 
 # ==================== Lead Schemas ====================
@@ -131,9 +151,18 @@ class DraftUpdate(BaseModel):
     edit_summary: Optional[str] = None
 
 
+class DraftApprovalAction(str, Enum):
+    """Draft approval action values"""
+    APPROVE = "approve"
+    REJECT = "reject"
+    EDIT = "edit"
+    SAVE = "save"
+    SKIP = "skip"
+
+
 class DraftApproval(BaseModel):
     """Schema for draft approval action"""
-    action: str = Field(..., pattern="^(approve|reject|edit|save|skip)$")
+    action: DraftApprovalAction
     feedback: Optional[str] = None
     edited_content: Optional[str] = None
     edited_subject: Optional[str] = None

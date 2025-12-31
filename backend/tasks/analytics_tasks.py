@@ -3,7 +3,7 @@ Celery tasks for analytics generation
 Periodic tasks for generating insights and snapshots
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from tasks.celery_app import celery_app
 from agents import get_analytics_agent
@@ -23,13 +23,13 @@ def generate_daily_snapshot():
             analytics_agent = get_analytics_agent()
 
             # Generate snapshot for yesterday (complete day)
-            yesterday = datetime.utcnow() - timedelta(days=1)
+            yesterday = datetime.now(timezone.utc) - timedelta(days=1)
 
             snapshot = await analytics_agent.generate_daily_snapshot(date=yesterday)
 
             if snapshot:
                 logger.info(
-                    f"✅ Generated daily snapshot: "
+                    f"Generated daily snapshot: "
                     f"{snapshot.get('leads_received')} leads, "
                     f"{snapshot.get('drafts_created')} drafts, "
                     f"avg quality {snapshot.get('avg_lead_quality'):.1f}"
@@ -65,7 +65,7 @@ def update_trending_products():
             trending = await analytics_agent.get_trending_products(days=7)
 
             logger.info(
-                f"✅ Updated trending products: {len(trending)} products tracked"
+                f"Updated trending products: {len(trending)} products tracked"
             )
 
             return {
@@ -102,11 +102,11 @@ def generate_weekly_report():
                 'lead_stats': lead_stats,
                 'response_metrics': response_metrics,
                 'trending_products': trending[:10],
-                'generated_at': datetime.utcnow().isoformat()
+                'generated_at': datetime.now(timezone.utc).isoformat()
             }
 
             logger.info(
-                f"✅ Generated weekly report: "
+                f"Generated weekly report: "
                 f"{lead_stats.get('total_leads', 0)} leads, "
                 f"{response_metrics.get('total_drafts', 0)} drafts"
             )

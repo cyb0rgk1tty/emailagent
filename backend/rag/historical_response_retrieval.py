@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db_session
 from models.database import HistoricalResponseExample
 from rag.embeddings import get_embedding_generator
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +77,11 @@ class HistoricalResponseRetrieval:
                     .limit(k)
                 )
 
+                # Format embedding for pgvector
+                embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
                 result = await session.execute(
                     query_stmt,
-                    {"query_embedding": str(query_embedding)}
+                    {"query_embedding": embedding_str}
                 )
 
                 rows = result.all()
@@ -170,7 +173,7 @@ class HistoricalResponseRetrieval:
             return query
 
         except Exception as e:
-            logger.error(f"Error building query: {e}")
+            logger.error(f"Error building query: {e}", exc_info=True)
             return ""
 
     def _generate_context_description(
@@ -218,16 +221,15 @@ class HistoricalResponseRetrieval:
                 return "Similar inquiry pattern"
 
         except Exception as e:
-            logger.error(f"Error generating context description: {e}")
+            logger.error(f"Error generating context description: {e}", exc_info=True)
             return "Similar inquiry"
 
     def _extract_products_from_text(self, text: str) -> List[str]:
         """Extract product type mentions from text"""
         text_lower = text.lower()
-        common_products = [
-            'probiotic', 'protein', 'vitamin', 'electrolyte', 'greens',
-            'collagen', 'omega', 'creatine', 'pre-workout', 'multivitamin'
-        ]
+        # Use product types from config
+        settings = get_settings()
+        common_products = [p.lower() for p in settings.PRODUCT_TYPES]
 
         found_products = [p for p in common_products if p in text_lower]
         return found_products
@@ -282,7 +284,7 @@ YOUR ACTUAL RESPONSE:
             formatted_parts.append(formatted)
 
         header = f"""
-📚 FOUND {len(examples)} SIMILAR PAST INQUIRIES WITH YOUR RESPONSES
+FOUND {len(examples)} SIMILAR PAST INQUIRIES WITH YOUR RESPONSES
 
 Use these examples to understand your writing style and how you handle similar inquiries.
 Adapt the tone, structure, and approach while addressing the current inquiry's specific needs.
@@ -309,7 +311,7 @@ Adapt the tone, structure, and approach while addressing the current inquiry's s
                 return len(examples)
 
         except Exception as e:
-            logger.error(f"Error getting historical response count: {e}")
+            logger.error(f"Error getting historical response count: {e}", exc_info=True)
             return 0
 
 

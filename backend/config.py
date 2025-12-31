@@ -12,8 +12,8 @@ class Settings(BaseSettings):
 
     # Application
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    DEBUG: bool = False
+    SECRET_KEY: str  # Required - no default for security
 
     # Database
     DATABASE_URL: str
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     EMAIL_IMAP_PORT: int = 993
     EMAIL_SMTP_HOST: str = ""
     EMAIL_SMTP_PORT: int = 587
-    EMAIL_CC_RECIPIENTS: str = "cyin@nutricraftlabs.com,david@nutricraftlabs.com"  # Always CC these addresses
+    EMAIL_CC_RECIPIENTS: str = ""  # Optional: comma-separated CC addresses
 
     # Historical Email Configuration (for backfill)
     HISTORICAL_EMAIL_ADDRESS: str = ""
@@ -60,14 +60,11 @@ class Settings(BaseSettings):
     # Optional: OpenAI for embeddings only
     OPENAI_API_KEY: str = ""
 
-    # CORS
+    # CORS - Override via CORS_ORIGINS env var as JSON array
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://frontend:3000",
-        "http://192.168.50.5:3001",  # Network IP frontend
-        "http://192.168.50.5:8001",  # Network IP backend
-        "https://nutricraftlabs.com"
     ]
 
     # RAG Configuration
@@ -154,6 +151,31 @@ class Settings(BaseSettings):
 
 # Create global settings instance
 settings = Settings()
+
+
+def validate_settings() -> None:
+    """Validate that required settings are properly configured
+
+    Raises:
+        ValueError: If required settings are missing or invalid
+    """
+    errors = []
+
+    if not settings.SECRET_KEY or len(settings.SECRET_KEY) < 32:
+        errors.append("SECRET_KEY must be set and at least 32 characters")
+
+    if not settings.DATABASE_URL:
+        errors.append("DATABASE_URL must be set")
+
+    if not settings.OPENROUTER_API_KEY:
+        errors.append("OPENROUTER_API_KEY must be set for AI features")
+
+    if settings.ENVIRONMENT == "production":
+        if settings.DEBUG:
+            errors.append("DEBUG should be False in production")
+
+    if errors:
+        raise ValueError("Configuration errors:\n" + "\n".join(f"  - {e}" for e in errors))
 
 
 def get_settings() -> Settings:

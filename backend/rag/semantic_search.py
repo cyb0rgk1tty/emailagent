@@ -62,7 +62,7 @@ class SemanticSearch:
             return embedding_record
 
         except Exception as e:
-            logger.error(f"Error storing chunk: {e}")
+            logger.error(f"Error storing chunk: {e}", exc_info=True)
             return None
 
     async def store_chunks(
@@ -117,7 +117,7 @@ class SemanticSearch:
 
             except Exception as e:
                 await session.rollback()
-                logger.error(f"Error storing chunks: {e}")
+                logger.error(f"Error storing chunks: {e}", exc_info=True)
 
         return stored_count
 
@@ -171,9 +171,11 @@ class SemanticSearch:
                     )
 
                 # Execute query with parameters
+                # Format embedding as PostgreSQL vector string: '[0.1,0.2,...]'
+                embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
                 result = await session.execute(
                     query_stmt,
-                    {"query_embedding": str(query_embedding)}
+                    {"query_embedding": embedding_str}
                 )
 
                 rows = result.all()
@@ -201,7 +203,7 @@ class SemanticSearch:
                 return results
 
         except Exception as e:
-            logger.error(f"Error performing similarity search: {e}")
+            logger.error(f"Error performing similarity search: {e}", exc_info=True)
             return []
 
     async def get_document_count(self) -> int:
@@ -222,7 +224,7 @@ class SemanticSearch:
                 return len(documents)
 
         except Exception as e:
-            logger.error(f"Error getting document count: {e}")
+            logger.error(f"Error getting document count: {e}", exc_info=True)
             return 0
 
     async def get_chunk_count(self) -> int:
@@ -242,7 +244,7 @@ class SemanticSearch:
                 return len(chunks)
 
         except Exception as e:
-            logger.error(f"Error getting chunk count: {e}")
+            logger.error(f"Error getting chunk count: {e}", exc_info=True)
             return 0
 
     async def delete_document(self, document_name: str) -> int:
@@ -274,7 +276,7 @@ class SemanticSearch:
                 return len(chunks)
 
         except Exception as e:
-            logger.error(f"Error deleting document: {e}")
+            logger.error(f"Error deleting document: {e}", exc_info=True)
             return 0
 
     async def get_context_for_query(

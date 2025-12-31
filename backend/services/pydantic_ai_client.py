@@ -2,12 +2,28 @@
 PydanticAI client configuration for OpenRouter
 Provides configured models for all agents
 """
+import logging
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 from config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def _validate_api_key() -> None:
+    """Validate OpenRouter API key is configured"""
+    if not settings.OPENROUTER_API_KEY:
+        raise ValueError(
+            "OPENROUTER_API_KEY is not configured. "
+            "Set it in .env or environment variables."
+        )
+    if not settings.OPENROUTER_API_KEY.startswith("sk-or-"):
+        logger.warning(
+            "OPENROUTER_API_KEY doesn't start with 'sk-or-'. "
+            "This may not be a valid OpenRouter API key."
+        )
 
 
 def get_extraction_model() -> OpenAIChatModel:
@@ -15,7 +31,12 @@ def get_extraction_model() -> OpenAIChatModel:
 
     Returns:
         OpenAIChatModel configured for OpenRouter with extraction settings
+
+    Raises:
+        ValueError: If API key is not configured
     """
+    _validate_api_key()
+
     model_settings = ModelSettings(
         temperature=settings.LLM_TEMPERATURE_EXTRACTION,
         max_tokens=settings.LLM_MAX_TOKENS,
@@ -37,7 +58,12 @@ def get_response_model() -> OpenAIChatModel:
 
     Returns:
         OpenAIChatModel configured for OpenRouter with response settings
+
+    Raises:
+        ValueError: If API key is not configured
     """
+    _validate_api_key()
+
     model_settings = ModelSettings(
         temperature=settings.LLM_TEMPERATURE_RESPONSE,
         max_tokens=settings.LLM_MAX_TOKENS,

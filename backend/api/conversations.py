@@ -230,8 +230,8 @@ async def list_conversations(
 
     # Optional: filter for active conversations (recent activity)
     if active_only:
-        from datetime import timedelta
-        cutoff_date = datetime.utcnow() - timedelta(days=30)
+        from datetime import timedelta, timezone
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
         query = query.where(Conversation.last_activity_at >= cutoff_date)
 
     query = query.offset(skip).limit(limit)

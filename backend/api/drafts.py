@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, or_, and_
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from database import get_db
 from models.database import Draft, Lead
-from models.schemas import DraftCreate, DraftResponse, DraftUpdate, DraftApproval
+from models.schemas import DraftCreate, DraftResponse, DraftUpdate, DraftApproval, DraftStatus, DraftApprovalAction
 from tasks.email_tasks import send_approved_draft
 
 router = APIRouter()
@@ -157,38 +157,38 @@ async def approve_draft(
         raise HTTPException(status_code=404, detail="Draft not found")
 
     draft.reviewed_by = approval.reviewed_by or "system"
-    draft.reviewed_at = datetime.utcnow()
+    draft.reviewed_at = datetime.now(timezone.utc)
 
     # Track if we need to queue email sending
     should_send_email = False
 
-    if approval.action == "approve":
-        draft.status = "approved"
-        draft.approved_at = datetime.utcnow()
+    if approval.action == DraftApprovalAction.APPROVE:
+        draft.status = DraftStatus.APPROVED.value
+        draft.approved_at = datetime.now(timezone.utc)
         should_send_email = True
 
-    elif approval.action == "reject":
-        draft.status = "rejected"
+    elif approval.action == DraftApprovalAction.REJECT:
+        draft.status = DraftStatus.REJECTED.value
         draft.approval_feedback = approval.feedback
 
-    elif approval.action == "edit":
-        draft.status = "edited"
+    elif approval.action == DraftApprovalAction.EDIT:
+        draft.status = DraftStatus.EDITED.value
         if approval.edited_content:
             draft.draft_content = approval.edited_content
         if approval.edited_subject:
             draft.subject_line = approval.edited_subject
         draft.edit_summary = approval.feedback
 
-    elif approval.action == "save":
+    elif approval.action == DraftApprovalAction.SAVE:
         # Keep status as pending, just save any edits
         if approval.edited_content:
             draft.draft_content = approval.edited_content
         if approval.edited_subject:
             draft.subject_line = approval.edited_subject
 
-    elif approval.action == "skip":
+    elif approval.action == DraftApprovalAction.SKIP:
         # Mark as skipped (already handled manually)
-        draft.status = "skipped"
+        draft.status = DraftStatus.SKIPPED.value
         draft.approval_feedback = approval.feedback or "Already handled manually"
 
     # Save customer sentiment feedback if provided

@@ -29,6 +29,10 @@ pydantic==2.10.6  # Required by pydantic-ai (>=2.10)
 pydantic-settings==2.1.0
 email-validator==2.1.0.post1
 
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
 # Document Processing for RAG
 PyPDF2==3.0.1
 python-docx==1.1.0

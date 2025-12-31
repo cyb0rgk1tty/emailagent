@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from database import get_db
 from models.database import Lead, Draft, ProductTypeTrend
@@ -51,7 +51,7 @@ async def get_analytics_overview(
     db: AsyncSession = Depends(get_db)
 ):
     """Get analytics overview"""
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Total leads (excluding spam)
     total_leads_result = await db.execute(
@@ -158,7 +158,7 @@ async def get_product_trends(
     db: AsyncSession = Depends(get_db)
 ):
     """Get product type trends"""
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     result = await db.execute(
         select(ProductTypeTrend)
@@ -182,7 +182,7 @@ async def get_product_type_distribution(
     Uses PostgreSQL unnest to properly handle array columns.
     Excludes spam leads.
     """
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     # PostgreSQL query to expand arrays and count occurrences
     query = text("""

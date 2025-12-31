@@ -5,9 +5,13 @@ Handles email ingestion, extraction, and response generation
 import logging
 import re
 from typing import Dict, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
+
+from config import get_settings
+
+settings = get_settings()
 
 from tasks.celery_app import celery_app
 from database import get_db_session
@@ -98,12 +102,12 @@ def process_email(email_data: Dict):
 
         try:
             # Filter out internal employee emails (but allow contact form from info@)
-            # Contact form submissions come from info@nutricraftlabs.com
-            # Internal employee replies come from employee addresses like cyin@nutricraftlabs.com
-            if '@' in sender_email:
+            # The internal domain is configured via EMAIL_ADDRESS
+            internal_domain = settings.EMAIL_ADDRESS.split('@')[-1] if '@' in settings.EMAIL_ADDRESS else None
+            if internal_domain and '@' in sender_email:
                 sender_lower = sender_email.lower()
                 # Skip internal employee emails but allow info@ (contact form)
-                if sender_lower.endswith('@nutricraftlabs.com') and not sender_lower.startswith('info@'):
+                if sender_lower.endswith(f'@{internal_domain}') and not sender_lower.startswith('info@'):
                     logger.info(f"Skipping internal employee email from {sender_email}")
                     return {'status': 'skipped', 'reason': 'internal_email', 'sender': sender_email}
 
@@ -173,8 +177,8 @@ def process_email(email_data: Dict):
                 participants=[email_data.get('sender_email')],
                 initial_message_id=message_id,
                 last_message_id=message_id,
-                started_at=email_data.get('received_at') or datetime.utcnow(),
-                last_activity_at=email_data.get('received_at') or datetime.utcnow()
+                started_at=email_data.get('received_at') or datetime.now(timezone.utc),
+                last_activity_at=email_data.get('received_at') or datetime.now(timezone.utc)
             )
             session.add(conversation)
             await session.flush()
@@ -190,8 +194,8 @@ def process_email(email_data: Dict):
                 sender_name=email_data.get('sender_name'),
                 subject=email_data.get('subject'),
                 body=email_data.get('body'),
-                received_at=email_data.get('received_at') or datetime.utcnow(),
-                processed_at=datetime.utcnow(),
+                received_at=email_data.get('received_at') or datetime.now(timezone.utc),
+                processed_at=datetime.now(timezone.utc),
 
                 # Extracted data
                 product_type=extracted_data.get('product_type'),
@@ -230,7 +234,7 @@ def process_email(email_data: Dict):
                 sender_name=email_data.get('sender_name'),
                 subject=email_data.get('subject'),
                 body=email_data.get('body'),
-                received_at=email_data.get('received_at') or datetime.utcnow()
+                received_at=email_data.get('received_at') or datetime.now(timezone.utc)
             )
             session.add(email_message)
 
@@ -253,7 +257,7 @@ def process_email(email_data: Dict):
                 lead.internal_notes = f"Spam/Advertisement: {spam_reason}"
                 await session.commit()
 
-            logger.info(f"✅ Processed spam/advertisement email {message_id} - no draft generated")
+            logger.info(f"Processed spam/advertisement email {message_id} - no draft generated")
 
             return {
                 'status': 'success',
@@ -339,7 +343,7 @@ def process_email(email_data: Dict):
         analytics_agent = get_analytics_agent()
         await analytics_agent.update_product_trends_from_lead(lead_id)
 
-        logger.info(f"✅ Successfully processed new inquiry {message_id}")
+        logger.info(f"Successfully processed new inquiry {message_id}")
 
         return {
             'status': 'success',
@@ -375,7 +379,7 @@ def process_email(email_data: Dict):
                 sender_name=email_data.get('sender_name'),
                 subject=email_data.get('subject'),
                 body=cleaned_body,
-                received_at=email_data.get('received_at') or datetime.utcnow()
+                received_at=email_data.get('received_at') or datetime.now(timezone.utc)
             )
             session.add(email_message)
 
@@ -387,7 +391,7 @@ def process_email(email_data: Dict):
             conversation = result.scalar_one_or_none()
             if conversation:
                 conversation.last_message_id = message_id
-                conversation.last_activity_at = datetime.utcnow()
+                conversation.last_activity_at = datetime.now(timezone.utc)
 
             # Update lead status
             result = await session.execute(
@@ -396,11 +400,11 @@ def process_email(email_data: Dict):
             lead = result.scalar_one_or_none()
             if lead:
                 lead.lead_status = 'customer_replied'
-                lead.updated_at = datetime.utcnow()
+                lead.updated_at = datetime.now(timezone.utc)
 
             await session.commit()
 
-        logger.info(f"✅ Processed reply {message_id} for lead {original_lead_id}")
+        logger.info(f"Processed reply {message_id} for lead {original_lead_id}")
 
         return {
             'status': 'success',
@@ -430,13 +434,13 @@ def process_email(email_data: Dict):
                 sender_name=email_data.get('sender_name'),
                 subject=email_data.get('subject'),
                 body=cleaned_body,
-                received_at=email_data.get('received_at') or datetime.utcnow(),
-                processed_at=datetime.utcnow()
+                received_at=email_data.get('received_at') or datetime.now(timezone.utc),
+                processed_at=datetime.now(timezone.utc)
             )
             session.add(lead)
             await session.commit()
 
-        logger.info(f"✅ Marked email {message_id} as duplicate of lead {original_lead_id}")
+        logger.info(f"Marked email {message_id} as duplicate of lead {original_lead_id}")
 
         return {
             'status': 'success',
@@ -476,8 +480,8 @@ def process_email(email_data: Dict):
                     participants=[email_data.get('sender_email')],
                     initial_message_id=message_id,
                     last_message_id=message_id,
-                    started_at=email_data.get('received_at') or datetime.utcnow(),
-                    last_activity_at=email_data.get('received_at') or datetime.utcnow()
+                    started_at=email_data.get('received_at') or datetime.now(timezone.utc),
+                    last_activity_at=email_data.get('received_at') or datetime.now(timezone.utc)
                 )
                 session.add(conversation)
                 await session.flush()
@@ -491,7 +495,7 @@ def process_email(email_data: Dict):
                 conversation = result.scalar_one_or_none()
                 if conversation:
                     conversation.last_message_id = message_id
-                    conversation.last_activity_at = datetime.utcnow()
+                    conversation.last_activity_at = datetime.now(timezone.utc)
 
             # Create new lead linked to parent
             lead = Lead(
@@ -503,8 +507,8 @@ def process_email(email_data: Dict):
                 sender_name=email_data.get('sender_name'),
                 subject=email_data.get('subject'),
                 body=email_data.get('body'),
-                received_at=email_data.get('received_at') or datetime.utcnow(),
-                processed_at=datetime.utcnow(),
+                received_at=email_data.get('received_at') or datetime.now(timezone.utc),
+                processed_at=datetime.now(timezone.utc),
 
                 # Extracted data
                 product_type=extracted_data.get('product_type'),
@@ -543,7 +547,7 @@ def process_email(email_data: Dict):
                 sender_name=email_data.get('sender_name'),
                 subject=email_data.get('subject'),
                 body=email_data.get('body'),
-                received_at=email_data.get('received_at') or datetime.utcnow()
+                received_at=email_data.get('received_at') or datetime.now(timezone.utc)
             )
             session.add(email_message)
 
@@ -581,7 +585,7 @@ def process_email(email_data: Dict):
         else:
             draft_id = None
 
-        logger.info(f"✅ Processed follow-up inquiry {message_id}")
+        logger.info(f"Processed follow-up inquiry {message_id}")
 
         return {
             'status': 'success',
@@ -729,7 +733,7 @@ def send_approved_draft(draft_id: int):
 
                 # Update draft status
                 draft.status = 'sent'
-                draft.sent_at = datetime.utcnow()
+                draft.sent_at = datetime.now(timezone.utc)
 
                 # Create outbound email message record
                 if lead_conversation_id:
@@ -753,7 +757,7 @@ def send_approved_draft(draft_id: int):
                         body=email_body_with_quote,
                         is_draft_sent=True,
                         draft_id=draft_id,
-                        sent_at=datetime.utcnow()
+                        sent_at=datetime.now(timezone.utc)
                     )
                     update_session.add(email_message)
 
@@ -764,16 +768,16 @@ def send_approved_draft(draft_id: int):
                     conversation = result.scalar_one_or_none()
                     if conversation:
                         conversation.last_message_id = sent_message_id
-                        conversation.last_activity_at = datetime.utcnow()
+                        conversation.last_activity_at = datetime.now(timezone.utc)
 
                 # Skip embedding generation for edited drafts (async operation)
                 # This can be done by a separate async task if needed
                 if draft_edit_summary:
-                    logger.info(f"📚 Draft {draft_id} was edited - skipping embedding generation in sync task")
+                    logger.info(f"Draft {draft_id} was edited - skipping embedding generation in sync task")
 
                 update_session.commit()
 
-            logger.info(f"✅ Sent draft {draft_id} to {lead_sender_email}")
+            logger.info(f"Sent draft {draft_id} to {lead_sender_email}")
 
             return {
                 'status': 'success',

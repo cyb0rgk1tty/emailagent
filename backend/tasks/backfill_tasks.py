@@ -59,7 +59,7 @@ def backfill_historical_emails(
                     result['patterns_analyzed'] = True
                     result['pattern_count'] = patterns.get('sample_count', 0)
                 except Exception as e:
-                    logger.error(f"Error analyzing patterns: {e}")
+                    logger.error(f"Error analyzing patterns: {e}", exc_info=True)
                     result['patterns_analyzed'] = False
 
             logger.info(f"Backfill task completed: {result}")
@@ -93,7 +93,7 @@ def analyze_response_patterns():
             analyzer = get_response_style_analyzer()
             patterns = await analyzer.analyze_all_responses()
 
-            logger.info(f"✅ Analysis complete: {patterns.get('sample_count', 0)} responses analyzed")
+            logger.info(f"Analysis complete: {patterns.get('sample_count', 0)} responses analyzed")
 
             return {
                 'status': 'success',

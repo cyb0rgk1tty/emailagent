@@ -7,9 +7,9 @@ import smtplib
 import email
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.utils import parseaddr
+from email.utils import parseaddr, formatdate
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import logging
 
 from config import get_settings
@@ -57,10 +57,7 @@ class EmailService:
 
         try:
             # Connect to IMAP server
-            if self.imap_port == 993:
-                mail = imaplib.IMAP4_SSL(self.imap_host, self.imap_port)
-            else:
-                mail = imaplib.IMAP4(self.imap_host, self.imap_port)
+            mail = self._connect_imap()
 
             # Login
             mail.login(self.email_address, self.email_password)
@@ -69,8 +66,7 @@ class EmailService:
             mail.select(folder)
 
             # Calculate date cutoff for filtering
-            from datetime import timedelta
-            cutoff_date = datetime.utcnow() - timedelta(days=since_days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=since_days)
             date_str = cutoff_date.strftime('%d-%b-%Y')
 
             # Search for emails since cutoff date (checks ALL emails, not just UNSEEN)
@@ -120,7 +116,7 @@ class EmailService:
                         mail.store(msg_id, '+FLAGS', '\\Seen')
 
                 except Exception as e:
-                    logger.error(f"Error parsing email {msg_id}: {e}")
+                    logger.error(f"Error parsing email {msg_id}: {e}", exc_info=True)
 
             mail.logout()
 
@@ -130,6 +126,17 @@ class EmailService:
         except Exception as e:
             logger.error(f"Error fetching emails: {e}", exc_info=True)
             return []
+
+    def _connect_imap(self) -> imaplib.IMAP4:
+        """Connect to IMAP server
+
+        Returns:
+            IMAP connection object
+        """
+        if self.imap_port == 993:
+            return imaplib.IMAP4_SSL(self.imap_host, self.imap_port)
+        else:
+            return imaplib.IMAP4(self.imap_host, self.imap_port)
 
     def _parse_email(self, email_message) -> Optional[Dict]:
         """Parse email message into structured data
@@ -183,10 +190,10 @@ class EmailService:
                 from email.utils import parsedate_to_datetime
                 try:
                     received_at = parsedate_to_datetime(date_str)
-                except:
-                    received_at = datetime.utcnow()
+                except Exception:
+                    received_at = datetime.now(timezone.utc)
             else:
-                received_at = datetime.utcnow()
+                received_at = datetime.now(timezone.utc)
 
             # Get body
             body = self._get_email_body(email_message)
@@ -211,7 +218,7 @@ class EmailService:
             return email_data
 
         except Exception as e:
-            logger.error(f"Error parsing email: {e}")
+            logger.error(f"Error parsing email: {e}", exc_info=True)
             return None
 
     def _parse_email_headers(self, email_message) -> Dict:
@@ -259,7 +266,7 @@ class EmailService:
             return headers
 
         except Exception as e:
-            logger.error(f"Error parsing email headers: {e}")
+            logger.error(f"Error parsing email headers: {e}", exc_info=True)
             return {}
 
     def _get_email_body(self, email_message) -> str:
@@ -290,7 +297,7 @@ class EmailService:
                         charset = part.get_content_charset() or 'utf-8'
                         body = payload.decode(charset, errors='ignore')
                         break
-                    except:
+                    except Exception:
                         pass
 
                 # Fallback to text/html
@@ -302,7 +309,7 @@ class EmailService:
 
                         # Proper HTML to text conversion with formatting preservation
                         body = html_to_text(html_body)
-                    except:
+                    except Exception:
                         pass
         else:
             # Not multipart - get content directly
@@ -310,10 +317,111 @@ class EmailService:
                 payload = email_message.get_payload(decode=True)
                 charset = email_message.get_content_charset() or 'utf-8'
                 body = payload.decode(charset, errors='ignore')
-            except:
+            except Exception:
                 body = str(email_message.get_payload())
 
         return body.strip()
+
+    def _build_email_message(
+        self,
+        to_email: str,
+        to_name: str,
+        subject: str,
+        body: str,
+        in_reply_to: str = None
+    ) -> MIMEMultipart:
+        """Build email message
+
+        Args:
+            to_email: Recipient email address
+            to_name: Recipient name
+            subject: Email subject
+            body: Email body
+            in_reply_to: Message ID to reply to
+
+        Returns:
+            MIMEMultipart message object
+        """
+        msg = MIMEMultipart('alternative')
+        msg['From'] = f"{self.email_address}"
+        msg['To'] = f"{to_name} <{to_email}>"
+        msg['Subject'] = subject
+
+        # Add CC recipients
+        cc_recipients = settings.EMAIL_CC_RECIPIENTS
+        if cc_recipients:
+            msg['Cc'] = cc_recipients
+            logger.info(f"Adding CC recipients: {cc_recipients}")
+
+        if in_reply_to:
+            msg['In-Reply-To'] = in_reply_to
+            msg['References'] = in_reply_to
+
+        # Add body
+        text_part = MIMEText(body, 'plain', 'utf-8')
+        msg.attach(text_part)
+
+        return msg
+
+    def _send_via_smtp(self, msg: MIMEMultipart) -> None:
+        """Send email message via SMTP
+
+        Args:
+            msg: Email message to send
+        """
+        with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+            server.starttls()
+            server.login(self.email_address, self.email_password)
+            server.send_message(msg)
+
+    def _save_to_sent_folder_impl(self, msg: MIMEMultipart) -> None:
+        """Save sent email to Sent folder via IMAP APPEND
+
+        Args:
+            msg: Email message to save
+        """
+        if not self.imap_host or not self.email_address:
+            logger.warning("IMAP credentials not configured, skipping Sent folder save")
+            return
+
+        try:
+            # Connect to IMAP server
+            mail = self._connect_imap()
+
+            # Login
+            mail.login(self.email_address, self.email_password)
+
+            # Add Date header if not present
+            if 'Date' not in msg:
+                msg['Date'] = formatdate(localtime=True)
+
+            # Convert message to bytes
+            msg_bytes = msg.as_bytes()
+
+            # Append to Sent folder (try common folder names)
+            sent_folders = ['Sent', 'INBOX.Sent', '[Gmail]/Sent Mail', 'Sent Items']
+            saved = False
+
+            for folder in sent_folders:
+                try:
+                    status, _ = mail.append(folder, '\\Seen', None, msg_bytes)
+                    if status == 'OK':
+                        logger.info(f"Saved email to {folder} folder")
+                        saved = True
+                        break
+                except Exception as e:
+                    logger.debug(f"Failed to save to {folder}: {e}")
+                    continue
+
+            if not saved:
+                logger.warning("Could not find Sent folder to save email")
+
+            # Logout
+            mail.logout()
+
+        except Exception as e:
+            logger.error(f"Error saving to Sent folder: {e}", exc_info=True)
+            raise
 
     async def send_email(
         self,
@@ -323,7 +431,7 @@ class EmailService:
         body: str,
         in_reply_to: str = None
     ) -> bool:
-        """Send email via SMTP
+        """Send email via SMTP (async version)
 
         Args:
             to_email: Recipient email address
@@ -340,37 +448,17 @@ class EmailService:
             return False
 
         try:
-            # Create message
-            msg = MIMEMultipart('alternative')
-            msg['From'] = f"{self.email_address}"
-            msg['To'] = f"{to_name} <{to_email}>"
-            msg['Subject'] = subject
+            # Build message
+            msg = self._build_email_message(to_email, to_name, subject, body, in_reply_to)
 
-            # Add CC recipients (always include these team members)
-            cc_recipients = settings.EMAIL_CC_RECIPIENTS
-            if cc_recipients:
-                msg['Cc'] = cc_recipients
-                logger.info(f"Adding CC recipients: {cc_recipients}")
+            # Send via SMTP
+            self._send_via_smtp(msg)
 
-            if in_reply_to:
-                msg['In-Reply-To'] = in_reply_to
-                msg['References'] = in_reply_to
+            logger.info(f"Sent email to {to_email}: {subject}")
 
-            # Add body
-            text_part = MIMEText(body, 'plain', 'utf-8')
-            msg.attach(text_part)
-
-            # Connect and send via SMTP
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.email_address, self.email_password)
-                server.send_message(msg)
-
-            logger.info(f"Sent email to {to_email} (CC: {cc_recipients}): {subject}")
-
-            # Save to Sent folder via IMAP
+            # Save to Sent folder
             try:
-                await self._save_to_sent_folder(msg)
+                self._save_to_sent_folder_impl(msg)
             except Exception as e:
                 # Don't fail the send operation if saving to Sent fails
                 logger.warning(f"Failed to save email to Sent folder: {e}")
@@ -406,37 +494,17 @@ class EmailService:
             return False
 
         try:
-            # Create message
-            msg = MIMEMultipart('alternative')
-            msg['From'] = f"{self.email_address}"
-            msg['To'] = f"{to_name} <{to_email}>"
-            msg['Subject'] = subject
+            # Build message
+            msg = self._build_email_message(to_email, to_name, subject, body, in_reply_to)
 
-            # Add CC recipients (always include these team members)
-            cc_recipients = settings.EMAIL_CC_RECIPIENTS
-            if cc_recipients:
-                msg['Cc'] = cc_recipients
-                logger.info(f"Adding CC recipients: {cc_recipients}")
+            # Send via SMTP
+            self._send_via_smtp(msg)
 
-            if in_reply_to:
-                msg['In-Reply-To'] = in_reply_to
-                msg['References'] = in_reply_to
+            logger.info(f"Sent email to {to_email}: {subject}")
 
-            # Add body
-            text_part = MIMEText(body, 'plain', 'utf-8')
-            msg.attach(text_part)
-
-            # Connect and send via SMTP
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.email_address, self.email_password)
-                server.send_message(msg)
-
-            logger.info(f"Sent email to {to_email} (CC: {cc_recipients}): {subject}")
-
-            # Save to Sent folder via IMAP (synchronous)
+            # Save to Sent folder
             try:
-                self._save_to_sent_folder_sync(msg)
+                self._save_to_sent_folder_impl(msg)
             except Exception as e:
                 # Don't fail the send operation if saving to Sent fails
                 logger.warning(f"Failed to save email to Sent folder: {e}")
@@ -446,112 +514,6 @@ class EmailService:
         except Exception as e:
             logger.error(f"Error sending email to {to_email}: {e}", exc_info=True)
             return False
-
-    def _save_to_sent_folder_sync(self, msg: MIMEMultipart) -> None:
-        """Save sent email to Sent folder via IMAP APPEND (synchronous)
-
-        Args:
-            msg: Email message to save
-        """
-        if not self.imap_host or not self.email_address:
-            logger.warning("IMAP credentials not configured, skipping Sent folder save")
-            return
-
-        try:
-            # Connect to IMAP server
-            if self.imap_port == 993:
-                mail = imaplib.IMAP4_SSL(self.imap_host, self.imap_port)
-            else:
-                mail = imaplib.IMAP4(self.imap_host, self.imap_port)
-
-            # Login
-            mail.login(self.email_address, self.email_password)
-
-            # Add Date header if not present
-            from email.utils import formatdate
-            if 'Date' not in msg:
-                msg['Date'] = formatdate(localtime=True)
-
-            # Convert message to bytes
-            msg_bytes = msg.as_bytes()
-
-            # Append to Sent folder (try common folder names)
-            sent_folders = ['Sent', 'INBOX.Sent', '[Gmail]/Sent Mail', 'Sent Items']
-            saved = False
-
-            for folder in sent_folders:
-                try:
-                    status, _ = mail.append(folder, '\\Seen', None, msg_bytes)
-                    if status == 'OK':
-                        logger.info(f"Saved email to {folder} folder")
-                        saved = True
-                        break
-                except Exception as e:
-                    logger.debug(f"Failed to save to {folder}: {e}")
-                    continue
-
-            if not saved:
-                logger.warning("Could not find Sent folder to save email")
-
-            # Logout
-            mail.logout()
-
-        except Exception as e:
-            logger.error(f"Error saving to Sent folder: {e}")
-            raise
-
-    async def _save_to_sent_folder(self, msg: MIMEMultipart) -> None:
-        """Save sent email to Sent folder via IMAP APPEND
-
-        Args:
-            msg: Email message to save
-        """
-        if not self.imap_host or not self.email_address:
-            logger.warning("IMAP credentials not configured, skipping Sent folder save")
-            return
-
-        try:
-            # Connect to IMAP server
-            if self.imap_port == 993:
-                mail = imaplib.IMAP4_SSL(self.imap_host, self.imap_port)
-            else:
-                mail = imaplib.IMAP4(self.imap_host, self.imap_port)
-
-            # Login
-            mail.login(self.email_address, self.email_password)
-
-            # Add Date header if not present
-            from email.utils import formatdate
-            if 'Date' not in msg:
-                msg['Date'] = formatdate(localtime=True)
-
-            # Convert message to bytes
-            msg_bytes = msg.as_bytes()
-
-            # Append to Sent folder (try common folder names)
-            sent_folders = ['Sent', 'INBOX.Sent', '[Gmail]/Sent Mail', 'Sent Items']
-            saved = False
-
-            for folder in sent_folders:
-                try:
-                    status, _ = mail.append(folder, '\\Seen', None, msg_bytes)
-                    if status == 'OK':
-                        logger.info(f"Saved email to {folder} folder")
-                        saved = True
-                        break
-                except Exception as e:
-                    logger.debug(f"Failed to save to {folder}: {e}")
-                    continue
-
-            if not saved:
-                logger.warning("Could not find Sent folder to save email")
-
-            # Logout
-            mail.logout()
-
-        except Exception as e:
-            logger.error(f"Error saving to Sent folder: {e}")
-            raise
 
     async def test_connection(self) -> Dict[str, bool]:
         """Test IMAP and SMTP connections
@@ -566,19 +528,15 @@ class EmailService:
 
         # Test IMAP
         try:
-            if self.imap_port == 993:
-                mail = imaplib.IMAP4_SSL(self.imap_host, self.imap_port)
-            else:
-                mail = imaplib.IMAP4(self.imap_host, self.imap_port)
-
+            mail = self._connect_imap()
             mail.login(self.email_address, self.email_password)
             mail.logout()
 
             results['imap'] = True
-            logger.info("✅ IMAP connection successful")
+            logger.info("IMAP connection successful")
 
         except Exception as e:
-            logger.error(f"❌ IMAP connection failed: {e}")
+            logger.error(f"IMAP connection failed: {e}", exc_info=True)
 
         # Test SMTP
         try:
@@ -587,10 +545,10 @@ class EmailService:
                 server.login(self.email_address, self.email_password)
 
             results['smtp'] = True
-            logger.info("✅ SMTP connection successful")
+            logger.info("SMTP connection successful")
 
         except Exception as e:
-            logger.error(f"❌ SMTP connection failed: {e}")
+            logger.error(f"SMTP connection failed: {e}", exc_info=True)
 
         return results
 

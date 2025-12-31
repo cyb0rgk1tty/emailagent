@@ -7,7 +7,7 @@ import imaplib
 import email
 from email.utils import parseaddr, parsedate_to_datetime
 from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import re
 
@@ -172,9 +172,9 @@ class HistoricalBackfillService:
                 try:
                     received_at = parsedate_to_datetime(date_str)
                 except:
-                    received_at = datetime.utcnow()
+                    received_at = datetime.now(timezone.utc)
             else:
-                received_at = datetime.utcnow()
+                received_at = datetime.now(timezone.utc)
 
             # Get body
             body = self._get_email_body(email_message)
@@ -431,8 +431,8 @@ class HistoricalBackfillService:
                     participants=[inquiry.get('sender_email')],
                     initial_message_id=inquiry['message_id'],
                     last_message_id=response['message_id'],
-                    started_at=inquiry.get('received_at') or datetime.utcnow(),
-                    last_activity_at=response.get('received_at') or datetime.utcnow()
+                    started_at=inquiry.get('received_at') or datetime.now(timezone.utc),
+                    last_activity_at=response.get('received_at') or datetime.now(timezone.utc)
                 )
                 session.add(conversation)
                 await session.flush()
@@ -450,8 +450,8 @@ class HistoricalBackfillService:
                     sender_name=inquiry.get('sender_name'),
                     subject=inquiry.get('subject'),
                     body=inquiry.get('body'),
-                    received_at=inquiry.get('received_at') or datetime.utcnow(),
-                    processed_at=datetime.utcnow(),
+                    received_at=inquiry.get('received_at') or datetime.now(timezone.utc),
+                    processed_at=datetime.now(timezone.utc),
 
                     # Extracted data
                     product_type=extracted_data.get('product_type'),
@@ -491,7 +491,7 @@ class HistoricalBackfillService:
                     sender_name=inquiry.get('sender_name'),
                     subject=inquiry.get('subject'),
                     body=inquiry.get('body'),
-                    received_at=inquiry.get('received_at') or datetime.utcnow()
+                    received_at=inquiry.get('received_at') or datetime.now(timezone.utc)
                 )
                 session.add(inquiry_message)
 
@@ -507,7 +507,7 @@ class HistoricalBackfillService:
                     sender_name=response.get('sender_name'),
                     subject=response.get('subject'),
                     body=response.get('body'),
-                    sent_at=response.get('received_at') or datetime.utcnow()
+                    sent_at=response.get('received_at') or datetime.now(timezone.utc)
                 )
                 session.add(response_message)
 

@@ -4,7 +4,7 @@ Tracks product trends, lead quality, and business intelligence
 """
 import logging
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import Counter
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,7 @@ class AnalyticsAgent:
             date: Date of mention (default: now)
         """
         if not date:
-            date = datetime.utcnow()
+            date = datetime.now(timezone.utc)
 
         try:
             async with get_db_session() as session:
@@ -95,7 +95,7 @@ class AnalyticsAgent:
                 for product in product_types:
                     await self.track_product_trend(
                         product_type=product,
-                        date=lead.received_at or datetime.utcnow()
+                        date=lead.received_at or datetime.now(timezone.utc)
                     )
 
                 logger.info(f"Updated trends for lead {lead_id}: {len(product_types)} products")
@@ -113,7 +113,7 @@ class AnalyticsAgent:
             Snapshot data dictionary
         """
         if not date:
-            date = datetime.utcnow()
+            date = datetime.now(timezone.utc)
 
         try:
             async with get_db_session() as session:
@@ -223,7 +223,7 @@ class AnalyticsAgent:
         """
         try:
             async with get_db_session() as session:
-                cutoff_date = datetime.utcnow() - timedelta(days=days)
+                cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
                 # Get product mentions in the time period
                 result = await session.execute(
@@ -264,7 +264,7 @@ class AnalyticsAgent:
         """
         try:
             async with get_db_session() as session:
-                cutoff_date = datetime.utcnow() - timedelta(days=days)
+                cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
                 # Total leads
                 result = await session.execute(
@@ -341,7 +341,7 @@ class AnalyticsAgent:
         """
         try:
             async with get_db_session() as session:
-                cutoff_date = datetime.utcnow() - timedelta(days=days)
+                cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
                 # Total drafts
                 result = await session.execute(

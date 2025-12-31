@@ -1,15 +1,21 @@
 FROM node:18-alpine
 
+# Create app directory and set permissions
+RUN mkdir -p /app && chown -R node:node /app
+
 WORKDIR /app
 
+# Switch to non-root user
+USER node
+
 # Copy package files
-COPY package*.json ./
+COPY --chown=node:node package*.json ./
 
 # Install dependencies
 RUN npm install
 
 # Copy application code
-COPY . .
+COPY --chown=node:node . .
 
 # Expose port
 EXPOSE 3000

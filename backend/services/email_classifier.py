@@ -4,7 +4,7 @@ Classifies incoming emails as: new_inquiry, reply_to_us, duplicate, follow_up_in
 """
 import logging
 from typing import Dict, Optional, List, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -167,7 +167,7 @@ class EmailClassifier:
                 subject_clean = subject
 
             # Look for recent leads with similar content
-            cutoff_date = datetime.utcnow() - timedelta(days=lookback_days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
             result = await session.execute(
                 select(Lead).where(
@@ -230,7 +230,7 @@ class EmailClassifier:
         """
         try:
             # Check for previous leads from this sender
-            cutoff_date = datetime.utcnow() - timedelta(days=lookback_days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
             result = await session.execute(
                 select(Lead).where(
@@ -260,7 +260,7 @@ class EmailClassifier:
                     'parent_lead_id': previous_lead.id,
                     'conversation_id': previous_lead.conversation_id,
                     'days_since_last_contact': (
-                        datetime.utcnow() - previous_lead.received_at
+                        datetime.now(timezone.utc) - previous_lead.received_at
                     ).days
                 }
                 return True, metadata

@@ -5,11 +5,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from database import engine, Base, init_db, close_db
-from api import leads, drafts, analytics, knowledge, conversations, backfill, emails
-from config import settings
+from api import leads, drafts, analytics, knowledge, conversations, backfill, emails, auth
+from config import settings, validate_settings
 
 # Configure logging
 logging.basicConfig(
@@ -23,26 +23,34 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    logger.info("🚀 Starting Supplement Lead Intelligence System...")
+    logger.info("Starting Supplement Lead Intelligence System...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"Debug Mode: {settings.DEBUG}")
+
+    # Validate configuration
+    try:
+        validate_settings()
+        logger.info("Configuration validated successfully")
+    except ValueError as e:
+        logger.error(f"Configuration validation failed: {e}")
+        raise
 
     # Initialize database
     try:
         await init_db()
-        logger.info("✅ Database initialized successfully")
+        logger.info("Database initialized successfully")
     except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
+        logger.error(f"Database initialization failed: {e}", exc_info=True)
         raise
 
-    logger.info("✅ Application startup complete")
+    logger.info("Application startup complete")
 
     yield
 
     # Shutdown
-    logger.info("🛑 Shutting down application...")
+    logger.info("Shutting down application...")
     await close_db()
-    logger.info("✅ Shutdown complete")
+    logger.info("Shutdown complete")
 
 
 # Create FastAPI application
@@ -65,6 +73,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router)  # Auth routes at /api/auth
 app.include_router(leads.router, prefix="/api/leads", tags=["Leads"])
 app.include_router(drafts.router, prefix="/api/drafts", tags=["Drafts"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
@@ -92,7 +101,7 @@ async def health_check():
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
         "database": "connected",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 
