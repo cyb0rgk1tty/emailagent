@@ -1,27 +1,32 @@
-import { useState } from 'react'
+import { useState } from 'react';
+import type { Lead } from '../../types/api';
 
-export default function ExtractedLeadDataSection({ lead }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+interface ExtractedLeadDataSectionProps {
+  lead?: Lead;
+}
+
+export default function ExtractedLeadDataSection({ lead }: ExtractedLeadDataSectionProps): JSX.Element | null {
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Helper function to capitalize first letter of each word
-  const capitalizeText = (text) => {
-    if (!text) return text
+  const capitalizeText = (text: string | undefined): string => {
+    if (!text) return '';
     return text.split(' ').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    ).join(' ')
-  }
+    ).join(' ');
+  };
 
-  if (!lead) return null
+  if (!lead) return null;
 
-  const hasData = lead?.product_type?.length > 0 ||
-    lead?.certifications_requested?.length > 0 ||
-    lead?.delivery_format?.length > 0 ||
+  const hasData = (lead?.product_type?.length ?? 0) > 0 ||
+    (lead?.certifications_requested?.length ?? 0) > 0 ||
+    (lead?.delivery_format?.length ?? 0) > 0 ||
     lead?.estimated_quantity ||
     lead?.timeline_urgency ||
     lead?.experience_level ||
-    lead?.response_priority
+    lead?.response_priority;
 
-  if (!hasData) return null
+  if (!hasData) return null;
 
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
@@ -143,5 +148,5 @@ export default function ExtractedLeadDataSection({ lead }) {
         </div>
       )}
     </div>
-  )
+  );
 }

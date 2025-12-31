@@ -1,72 +1,137 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { knowledgeAPI } from '../services/api'
-import { Upload, RefreshCw, FileText, Database, Search, Trash2, AlertCircle } from 'lucide-react'
-import toast from 'react-hot-toast'
-import ConfirmModal from '../components/ConfirmModal'
+import { useState, FormEvent, ChangeEvent, ReactNode } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { knowledgeAPI } from '../services/api';
+import { Upload, RefreshCw, FileText, Database, Search, Trash2, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import ConfirmModal from '../components/ConfirmModal';
 
-export default function Knowledge() {
-  const queryClient = useQueryClient()
-  const [showUploadModal, setShowUploadModal] = useState(false)
-  const [showQueryModal, setShowQueryModal] = useState(false)
-  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, documentName: null })
+interface KnowledgeStats {
+  total_documents?: number;
+  total_chunks?: number;
+  documents_by_type?: Record<string, number>;
+}
+
+interface KnowledgeDocument {
+  document_name: string;
+  document_type: string;
+  chunk_count: number;
+  version: number;
+  last_updated: string;
+  is_active: boolean;
+}
+
+interface DocumentsResponse {
+  documents?: KnowledgeDocument[];
+}
+
+interface QueryResult {
+  document_name: string;
+  content?: string;
+  chunk_text?: string;
+  similarity_score?: number;
+  metadata?: {
+    section?: string;
+  };
+}
+
+interface QueryResults {
+  results: QueryResult[];
+  total_results?: number;
+}
+
+interface ConfirmModalState {
+  isOpen: boolean;
+  type: 'reindex' | 'delete' | null;
+  documentName: string | null;
+}
+
+interface StatCardProps {
+  title: string;
+  value: number;
+  subtitle?: string;
+  icon: ReactNode;
+  color: 'blue' | 'green' | 'purple';
+  loading: boolean;
+}
+
+interface DocumentRowProps {
+  document: KnowledgeDocument;
+  onDelete: (documentName: string) => void;
+}
+
+interface UploadModalProps {
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+interface QueryTestModalProps {
+  onClose: () => void;
+}
+
+export default function Knowledge(): JSX.Element {
+  const queryClient = useQueryClient();
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showQueryModal, setShowQueryModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({ isOpen: false, type: null, documentName: null });
 
   // Fetch knowledge base stats
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['knowledge', 'stats'],
     queryFn: knowledgeAPI.getStats,
-  })
+  });
 
   // Fetch documents
   const { data: documentsData, isLoading: docsLoading } = useQuery({
     queryKey: ['knowledge', 'documents'],
     queryFn: knowledgeAPI.getDocuments,
-  })
+  });
 
   // Reindex mutation
   const reindexMutation = useMutation({
     mutationFn: knowledgeAPI.reindex,
     onSuccess: () => {
-      toast.success('Knowledge base re-indexing started')
-      queryClient.invalidateQueries(['knowledge'])
+      toast.success('Knowledge base re-indexing started');
+      queryClient.invalidateQueries({ queryKey: ['knowledge'] });
     },
-    onError: (error) => {
-      toast.error(`Re-indexing failed: ${error.message}`)
+    onError: (error: Error) => {
+      toast.error(`Re-indexing failed: ${error.message}`);
     },
-  })
+  });
 
   // Delete document mutation
   const deleteMutation = useMutation({
-    mutationFn: (documentName) => knowledgeAPI.deleteDocument(documentName),
+    mutationFn: (documentName: string) => knowledgeAPI.deleteDocument(documentName),
     onSuccess: () => {
-      toast.success('Document deactivated successfully')
-      queryClient.invalidateQueries(['knowledge'])
+      toast.success('Document deactivated successfully');
+      queryClient.invalidateQueries({ queryKey: ['knowledge'] });
     },
-    onError: (error) => {
-      toast.error(`Delete failed: ${error.message}`)
+    onError: (error: Error) => {
+      toast.error(`Delete failed: ${error.message}`);
     },
-  })
+  });
 
-  const knowledgeStats = stats?.data || {}
-  const documents = documentsData?.data?.documents || []
+  const knowledgeStats = (stats?.data || {}) as KnowledgeStats;
+  const documents = ((documentsData?.data as DocumentsResponse)?.documents || []) as KnowledgeDocument[];
 
-  const handleReindex = () => {
-    setConfirmModal({ isOpen: true, type: 'reindex', documentName: null })
-  }
+  const handleReindex = (): void => {
+    setConfirmModal({ isOpen: true, type: 'reindex', documentName: null });
+  };
 
-  const handleDelete = (documentName) => {
-    setConfirmModal({ isOpen: true, type: 'delete', documentName })
-  }
+  const handleDelete = (documentName: string): void => {
+    setConfirmModal({ isOpen: true, type: 'delete', documentName });
+  };
 
-  const handleConfirmReindex = () => {
-    reindexMutation.mutate()
-    setConfirmModal({ isOpen: false, type: null, documentName: null })
-  }
+  const handleConfirmReindex = (): void => {
+    reindexMutation.mutate();
+    setConfirmModal({ isOpen: false, type: null, documentName: null });
+  };
 
-  const handleConfirmDelete = () => {
-    deleteMutation.mutate(confirmModal.documentName)
-    setConfirmModal({ isOpen: false, type: null, documentName: null })
-  }
+  const handleConfirmDelete = (): void => {
+    if (confirmModal.documentName) {
+      deleteMutation.mutate(confirmModal.documentName);
+    }
+    setConfirmModal({ isOpen: false, type: null, documentName: null });
+  };
 
   return (
     <div className="space-y-6">
@@ -185,8 +250,8 @@ export default function Knowledge() {
         <UploadModal
           onClose={() => setShowUploadModal(false)}
           onSuccess={() => {
-            setShowUploadModal(false)
-            queryClient.invalidateQueries(['knowledge'])
+            setShowUploadModal(false);
+            queryClient.invalidateQueries({ queryKey: ['knowledge'] });
           }}
         />
       )}
@@ -223,15 +288,15 @@ export default function Knowledge() {
         loading={deleteMutation.isPending}
       />
     </div>
-  )
+  );
 }
 
-function StatCard({ title, value, subtitle, icon, color, loading }) {
-  const colorClasses = {
+function StatCard({ title, value, subtitle, icon, color, loading }: StatCardProps): JSX.Element {
+  const colorClasses: Record<string, string> = {
     blue: 'from-blue-500 to-blue-600',
     green: 'from-green-500 to-green-600',
     purple: 'from-purple-500 to-purple-600',
-  }
+  };
 
   return (
     <div className={`bg-gradient-to-br ${colorClasses[color]} rounded-lg shadow-lg p-6 text-white`}>
@@ -252,10 +317,10 @@ function StatCard({ title, value, subtitle, icon, color, loading }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function DocumentRow({ document, onDelete }) {
+function DocumentRow({ document, onDelete }: DocumentRowProps): JSX.Element {
   return (
     <div className="p-6 hover:bg-gray-50 transition-colors">
       <div className="flex items-center justify-between">
@@ -289,38 +354,44 @@ function DocumentRow({ document, onDelete }) {
         </button>
       </div>
     </div>
-  )
+  );
 }
 
-function UploadModal({ onClose, onSuccess }) {
-  const queryClient = useQueryClient()
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [documentType, setDocumentType] = useState('faq')
+function UploadModal({ onClose, onSuccess }: UploadModalProps): JSX.Element {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [documentType, setDocumentType] = useState('faq');
 
   const uploadMutation = useMutation({
-    mutationFn: (formData) => knowledgeAPI.upload(formData),
+    mutationFn: (formData: FormData) => knowledgeAPI.upload(formData),
     onSuccess: () => {
-      toast.success('Document upload initiated (feature in development)')
-      onSuccess()
+      toast.success('Document upload initiated (feature in development)');
+      onSuccess();
     },
-    onError: (error) => {
-      toast.error(`Upload failed: ${error.message}`)
+    onError: (error: Error) => {
+      toast.error(`Upload failed: ${error.message}`);
     },
-  })
+  });
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
+    e.preventDefault();
     if (!selectedFile) {
-      toast.error('Please select a file')
-      return
+      toast.error('Please select a file');
+      return;
     }
 
-    const formData = new FormData()
-    formData.append('file', selectedFile)
-    formData.append('document_type', documentType)
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('document_type', documentType);
 
-    uploadMutation.mutate(formData)
-  }
+    uploadMutation.mutate(formData);
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setSelectedFile(files[0]);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -336,7 +407,7 @@ function UploadModal({ onClose, onSuccess }) {
             </label>
             <select
               value={documentType}
-              onChange={(e) => setDocumentType(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setDocumentType(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="faq">FAQ</option>
@@ -354,7 +425,7 @@ function UploadModal({ onClose, onSuccess }) {
             <input
               type="file"
               accept=".pdf,.md,.markdown"
-              onChange={(e) => setSelectedFile(e.target.files[0])}
+              onChange={handleFileChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             {selectedFile && (
@@ -394,34 +465,34 @@ function UploadModal({ onClose, onSuccess }) {
         </form>
       </div>
     </div>
-  )
+  );
 }
 
-function QueryTestModal({ onClose }) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState(null)
+function QueryTestModal({ onClose }: QueryTestModalProps): JSX.Element {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<QueryResults | null>(null);
 
   const queryMutation = useMutation({
-    mutationFn: (data) => knowledgeAPI.query(data),
+    mutationFn: (data: { query: string; top_k: number; threshold: number }) => knowledgeAPI.query(data),
     onSuccess: (response) => {
-      setResults(response.data)
-      if (response.data.results.length === 0) {
-        toast.info('No results found. Feature will be fully functional in Phase 2.')
+      setResults(response.data as QueryResults);
+      if ((response.data as QueryResults).results.length === 0) {
+        toast('No results found. Feature will be fully functional in Phase 2.', { icon: 'ℹ️' });
       }
     },
-    onError: (error) => {
-      toast.error(`Query failed: ${error.message}`)
+    onError: (error: Error) => {
+      toast.error(`Query failed: ${error.message}`);
     },
-  })
+  });
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
+    e.preventDefault();
     if (!query.trim()) {
-      toast.error('Please enter a query')
-      return
+      toast.error('Please enter a query');
+      return;
     }
-    queryMutation.mutate({ query, top_k: 5, threshold: 0.7 })
-  }
+    queryMutation.mutate({ query, top_k: 5, threshold: 0.7 });
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -439,7 +510,7 @@ function QueryTestModal({ onClose }) {
               </label>
               <textarea
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setQuery(e.target.value)}
                 placeholder="e.g., What certifications do you support?"
                 rows={3}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -497,7 +568,7 @@ function QueryTestModal({ onClose }) {
                           Score: {result.similarity_score?.toFixed(3)}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700">{result.content}</p>
+                      <p className="text-sm text-gray-700">{result.content || result.chunk_text}</p>
                       {result.metadata && (
                         <div className="mt-2 text-xs text-gray-500">
                           Section: {result.metadata.section || 'N/A'}
@@ -521,5 +592,5 @@ function QueryTestModal({ onClose }) {
         </div>
       </div>
     </div>
-  )
+  );
 }

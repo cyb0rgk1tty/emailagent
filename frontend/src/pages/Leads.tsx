@@ -1,63 +1,98 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { leadsAPI, conversationsAPI } from '../services/api'
-import { Search, Filter, X, MessageCircle, Mail, Calendar, Star, ArrowUpDown } from 'lucide-react'
+import { useState, ChangeEvent, MouseEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { leadsAPI, conversationsAPI } from '../services/api';
+import { Search, X, MessageCircle, Mail, Calendar, Star, ArrowUpDown } from 'lucide-react';
+import type { Lead, ConversationTimeline, TimelineEvent } from '../types/api';
 
-export default function Leads() {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [sortBy, setSortBy] = useState('received_at')
-  const [selectedLead, setSelectedLead] = useState(null)
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  color: 'blue' | 'green' | 'purple' | 'orange' | 'indigo';
+  subtitle?: string;
+}
+
+interface SortButtonProps {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}
+
+interface LeadRowProps {
+  lead: Lead;
+  onClick: () => void;
+}
+
+interface LeadDetailModalProps {
+  lead: Lead;
+  timeline?: ConversationTimeline;
+  onClose: () => void;
+}
+
+interface DetailFieldProps {
+  label: string;
+  value: string;
+}
+
+interface TimelineEventProps {
+  event: TimelineEvent;
+}
+
+export default function Leads(): JSX.Element {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortBy, setSortBy] = useState('received_at');
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   // Fetch all leads
   const { data: leadsData, isLoading } = useQuery({
     queryKey: ['leads', 'all'],
     queryFn: () => leadsAPI.getAll({ limit: 1000 }),
-  })
+  });
 
   // Fetch conversation timeline for selected lead
   const { data: timeline } = useQuery({
     queryKey: ['conversation', 'timeline', selectedLead?.id],
-    queryFn: () => conversationsAPI.getTimeline(selectedLead.id),
+    queryFn: () => conversationsAPI.getTimeline(selectedLead!.id),
     enabled: !!selectedLead?.id,
-  })
+  });
 
-  const leads = leadsData?.data || []
+  const leads = (leadsData?.data || []) as Lead[];
 
   // Filter and sort leads
   const filteredLeads = leads
     .filter(lead => {
       // Search filter
-      const searchLower = searchTerm.toLowerCase()
+      const searchLower = searchTerm.toLowerCase();
       const matchesSearch = !searchTerm ||
         lead.sender_email?.toLowerCase().includes(searchLower) ||
         lead.sender_name?.toLowerCase().includes(searchLower) ||
         lead.subject?.toLowerCase().includes(searchLower) ||
         lead.company_name?.toLowerCase().includes(searchLower) ||
-        lead.body?.toLowerCase().includes(searchLower)
+        lead.body?.toLowerCase().includes(searchLower);
 
       // Priority filter
-      const matchesPriority = !priorityFilter || lead.response_priority === priorityFilter
+      const matchesPriority = !priorityFilter || lead.response_priority === priorityFilter;
 
       // Status filter
-      const matchesStatus = !statusFilter || lead.lead_status === statusFilter
+      const matchesStatus = !statusFilter || lead.lead_status === statusFilter;
 
-      return matchesSearch && matchesPriority && matchesStatus
+      return matchesSearch && matchesPriority && matchesStatus;
     })
     .sort((a, b) => {
       switch (sortBy) {
         case 'received_at':
-          return new Date(b.received_at) - new Date(a.received_at)
+          return new Date(b.received_at).getTime() - new Date(a.received_at).getTime();
         case 'quality_score':
-          return (b.lead_quality_score || 0) - (a.lead_quality_score || 0)
-        case 'priority':
-          const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
-          return (priorityOrder[a.response_priority] || 4) - (priorityOrder[b.response_priority] || 4)
+          return (b.lead_quality_score || 0) - (a.lead_quality_score || 0);
+        case 'priority': {
+          const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+          return (priorityOrder[a.response_priority || ''] ?? 4) - (priorityOrder[b.response_priority || ''] ?? 4);
+        }
         default:
-          return 0
+          return 0;
       }
-    })
+    });
 
   // Calculate stats
   const stats = {
@@ -68,7 +103,7 @@ export default function Leads() {
     avgQuality: filteredLeads.length > 0
       ? (filteredLeads.reduce((sum, l) => sum + (l.lead_quality_score || 0), 0) / filteredLeads.length).toFixed(1)
       : '0.0',
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -98,7 +133,7 @@ export default function Leads() {
                 type="text"
                 placeholder="Search by email, name, company, subject..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {searchTerm && (
@@ -116,7 +151,7 @@ export default function Leads() {
           <div>
             <select
               value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setPriorityFilter(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Priorities</option>
@@ -131,7 +166,7 @@ export default function Leads() {
           <div>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Statuses</option>
@@ -208,25 +243,25 @@ export default function Leads() {
         />
       )}
     </div>
-  )
+  );
 }
 
-function StatCard({ label, value, color, subtitle }) {
-  const colorClasses = {
+function StatCard({ label, value, color, subtitle }: StatCardProps): JSX.Element {
+  const colorClasses: Record<string, string> = {
     blue: 'border-blue-200 bg-blue-50',
     green: 'border-green-200 bg-green-50',
     purple: 'border-purple-200 bg-purple-50',
     orange: 'border-orange-200 bg-orange-50',
     indigo: 'border-indigo-200 bg-indigo-50',
-  }
+  };
 
-  const textClasses = {
+  const textClasses: Record<string, string> = {
     blue: 'text-blue-900',
     green: 'text-green-900',
     purple: 'text-purple-900',
     orange: 'text-orange-900',
     indigo: 'text-indigo-900',
-  }
+  };
 
   return (
     <div className={`border rounded-lg p-4 ${colorClasses[color]}`}>
@@ -236,10 +271,10 @@ function StatCard({ label, value, color, subtitle }) {
         {subtitle && <span className="text-sm ml-1">{subtitle}</span>}
       </div>
     </div>
-  )
+  );
 }
 
-function SortButton({ active, onClick, label }) {
+function SortButton({ active, onClick, label }: SortButtonProps): JSX.Element {
   return (
     <button
       onClick={onClick}
@@ -251,30 +286,30 @@ function SortButton({ active, onClick, label }) {
     >
       {label}
     </button>
-  )
+  );
 }
 
-function LeadRow({ lead, onClick }) {
-  const getPriorityColor = (priority) => {
-    const colors = {
+function LeadRow({ lead, onClick }: LeadRowProps): JSX.Element {
+  const getPriorityColor = (priority: string | undefined): string => {
+    const colors: Record<string, string> = {
       critical: 'bg-red-100 text-red-800 border-red-300',
       high: 'bg-orange-100 text-orange-800 border-orange-300',
       medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
       low: 'bg-gray-100 text-gray-800 border-gray-300',
-    }
-    return colors[priority] || colors.medium
-  }
+    };
+    return colors[priority || ''] || colors.medium;
+  };
 
-  const getStatusColor = (status) => {
-    const colors = {
+  const getStatusColor = (status: string | undefined): string => {
+    const colors: Record<string, string> = {
       new: 'bg-blue-100 text-blue-800',
       responded: 'bg-green-100 text-green-800',
       customer_replied: 'bg-purple-100 text-purple-800',
       conversation_active: 'bg-indigo-100 text-indigo-800',
       closed: 'bg-gray-100 text-gray-800',
-    }
-    return colors[status] || colors.new
-  }
+    };
+    return colors[status || ''] || colors.new;
+  };
 
   return (
     <div
@@ -291,8 +326,8 @@ function LeadRow({ lead, onClick }) {
             <span className={`px-2 py-1 text-xs font-medium rounded border ${getPriorityColor(lead.response_priority)}`}>
               {lead.response_priority}
             </span>
-            <span className={`px-2 py-1 text-xs font-medium rounded ${getStatusColor(lead.lead_status)}`}>
-              {lead.lead_status?.replace(/_/g, ' ')}
+            <span className={`px-2 py-1 text-xs font-medium rounded ${getStatusColor(lead.lead_status as string)}`}>
+              {(lead.lead_status as string)?.replace(/_/g, ' ')}
             </span>
             {lead.is_duplicate && (
               <span className="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">
@@ -309,7 +344,7 @@ function LeadRow({ lead, onClick }) {
             </div>
             {lead.company_name && (
               <div className="flex items-center gap-1">
-                <span>•</span>
+                <span>-</span>
                 <span>{lead.company_name}</span>
               </div>
             )}
@@ -357,14 +392,20 @@ function LeadRow({ lead, onClick }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function LeadDetailModal({ lead, timeline, onClose }) {
+function LeadDetailModal({ lead, timeline, onClose }: LeadDetailModalProps): JSX.Element {
+  const handleBackdropClick = (e: MouseEvent<HTMLDivElement>): void => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
+      onClick={handleBackdropClick}
     >
       <div
         className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
@@ -392,8 +433,8 @@ function LeadDetailModal({ lead, timeline, onClose }) {
               <DetailField label="Email" value={lead.sender_email} />
               <DetailField label="Company" value={lead.company_name || 'N/A'} />
               <DetailField label="Quality Score" value={`${lead.lead_quality_score}/10`} />
-              <DetailField label="Priority" value={lead.response_priority} />
-              <DetailField label="Status" value={lead.lead_status?.replace(/_/g, ' ')} />
+              <DetailField label="Priority" value={lead.response_priority || 'N/A'} />
+              <DetailField label="Status" value={(lead.lead_status as string)?.replace(/_/g, ' ') || 'N/A'} />
               <DetailField label="Received" value={new Date(lead.received_at).toLocaleString()} />
             </div>
 
@@ -410,11 +451,11 @@ function LeadDetailModal({ lead, timeline, onClose }) {
               </div>
             )}
 
-            {lead.certifications_needed && lead.certifications_needed.length > 0 && (
+            {lead.certifications_requested && lead.certifications_requested.length > 0 && (
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-2">Certifications Needed:</div>
                 <div className="flex flex-wrap gap-2">
-                  {lead.certifications_needed.map((cert) => (
+                  {lead.certifications_requested.map((cert) => (
                     <span key={cert} className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
                       {cert}
                     </span>
@@ -442,7 +483,7 @@ function LeadDetailModal({ lead, timeline, onClose }) {
               </h3>
               <div className="space-y-4">
                 {timeline.timeline.map((event, idx) => (
-                  <TimelineEvent key={idx} event={event} />
+                  <TimelineEventComponent key={idx} event={event} />
                 ))}
               </div>
             </div>
@@ -450,33 +491,33 @@ function LeadDetailModal({ lead, timeline, onClose }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function DetailField({ label, value }) {
+function DetailField({ label, value }: DetailFieldProps): JSX.Element {
   return (
     <div>
       <div className="text-xs font-medium text-gray-500 uppercase">{label}</div>
       <div className="text-sm font-semibold text-gray-900 mt-1">{value}</div>
     </div>
-  )
+  );
 }
 
-function TimelineEvent({ event }) {
-  const getEventIcon = (type) => {
+function TimelineEventComponent({ event }: TimelineEventProps): JSX.Element {
+  const getEventIcon = (type: string): JSX.Element => {
     switch (type) {
       case 'lead_created':
-        return <Star className="w-4 h-4 text-blue-600" />
+        return <Star className="w-4 h-4 text-blue-600" />;
       case 'email_received':
       case 'email_sent':
-        return <Mail className="w-4 h-4 text-green-600" />
+        return <Mail className="w-4 h-4 text-green-600" />;
       case 'draft_created':
       case 'draft_approved':
-        return <MessageCircle className="w-4 h-4 text-purple-600" />
+        return <MessageCircle className="w-4 h-4 text-purple-600" />;
       default:
-        return <MessageCircle className="w-4 h-4 text-gray-600" />
+        return <MessageCircle className="w-4 h-4 text-gray-600" />;
     }
-  }
+  };
 
   return (
     <div className="flex gap-3">
@@ -503,5 +544,5 @@ function TimelineEvent({ event }) {
         )}
       </div>
     </div>
-  )
+  );
 }

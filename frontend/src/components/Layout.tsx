@@ -1,14 +1,20 @@
-import { Outlet, NavLink } from 'react-router-dom'
-import {  LayoutDashboard, Inbox, BarChart3, Users, BookOpen } from 'lucide-react'
+import { Outlet, NavLink } from 'react-router-dom';
+import { LayoutDashboard, Inbox, BarChart3, Users, BookOpen, LucideIcon } from 'lucide-react';
 
-const Layout = () => {
-  const navigation = [
+interface NavigationItem {
+  name: string;
+  to: string;
+  icon: LucideIcon;
+}
+
+const Layout = (): JSX.Element => {
+  const navigation: NavigationItem[] = [
     { name: 'Dashboard', to: '/', icon: LayoutDashboard },
     { name: 'Inbox', to: '/inbox', icon: Inbox },
     { name: 'Analytics', to: '/analytics', icon: BarChart3 },
     { name: 'Leads', to: '/leads', icon: Users },
     { name: 'Knowledge', to: '/knowledge', icon: BookOpen },
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -59,7 +65,7 @@ const Layout = () => {
         <Outlet />
       </main>
     </div>
-  )
-}
+  );
+};
 
-export default Layout
+export default Layout;

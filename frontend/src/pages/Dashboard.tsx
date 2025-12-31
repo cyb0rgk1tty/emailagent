@@ -1,36 +1,57 @@
-import { useQuery } from '@tanstack/react-query'
-import { leadsAPI, draftsAPI, analyticsAPI } from '../services/api'
+import { useQuery } from '@tanstack/react-query';
+import { leadsAPI, draftsAPI, analyticsAPI } from '../services/api';
+import type { Lead, Draft } from '../types/api';
 
-export default function Dashboard() {
+interface LeadsCountResponse {
+  total_leads: number;
+}
+
+interface DraftsCountResponse {
+  total_drafts: number;
+  pending_drafts: number;
+}
+
+interface AnalyticsSummaryResponse {
+  avg_response_time?: string;
+}
+
+export default function Dashboard(): JSX.Element {
   // Fetch stats
   const { data: leadsCount } = useQuery({
     queryKey: ['leadsCount'],
     queryFn: leadsAPI.getCount,
-  })
+  });
 
   const { data: draftsCount } = useQuery({
     queryKey: ['draftsCount'],
     queryFn: draftsAPI.getCount,
-  })
+  });
 
   const { data: analytics } = useQuery({
     queryKey: ['analytics', 'summary'],
     queryFn: () => analyticsAPI.getSummary(),
-  })
+  });
 
   const { data: recentLeads } = useQuery({
     queryKey: ['leads', 'recent'],
-    queryFn: () => leadsAPI.getAll({ limit: 5, sort: 'received_at' }),
-  })
+    queryFn: () => leadsAPI.getAll({ limit: 5 }),
+  });
 
   const { data: pendingDrafts } = useQuery({
     queryKey: ['drafts', 'pending', 'recent'],
     queryFn: () => draftsAPI.getPending(5),
-  })
+  });
 
-  const totalLeads = leadsCount?.data?.total_leads || 0
-  const totalDrafts = draftsCount?.data?.total_drafts || 0
-  const pendingCount = draftsCount?.data?.pending_drafts || 0
+  const leadsCountData = leadsCount?.data as LeadsCountResponse | undefined;
+  const draftsCountData = draftsCount?.data as DraftsCountResponse | undefined;
+  const analyticsData = analytics?.data as AnalyticsSummaryResponse | undefined;
+
+  const totalLeads = leadsCountData?.total_leads || 0;
+  const totalDrafts = draftsCountData?.total_drafts || 0;
+  const pendingCount = draftsCountData?.pending_drafts || 0;
+
+  const recentLeadsList = (recentLeads?.data || []) as Lead[];
+  const pendingDraftsList = (pendingDrafts?.data || []) as Draft[];
 
   return (
     <div className="space-y-6">
@@ -111,7 +132,7 @@ export default function Dashboard() {
             <div>
               <p className="text-purple-100 text-sm font-medium">Avg Response Time</p>
               <p className="text-3xl font-bold mt-2">
-                {analytics?.data?.avg_response_time || '<1m'}
+                {analyticsData?.avg_response_time || '<1m'}
               </p>
             </div>
             <div className="bg-purple-400 bg-opacity-30 rounded-full p-3">
@@ -135,11 +156,11 @@ export default function Dashboard() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Recent Leads</h2>
-            <a href="/leads" className="text-sm text-blue-600 hover:text-blue-800">View all →</a>
+            <a href="/leads" className="text-sm text-blue-600 hover:text-blue-800">View all &rarr;</a>
           </div>
           <div className="divide-y divide-gray-200">
-            {recentLeads?.data && recentLeads.data.length > 0 ? (
-              recentLeads.data.slice(0, 5).map((lead) => (
+            {recentLeadsList.length > 0 ? (
+              recentLeadsList.slice(0, 5).map((lead) => (
                 <div key={lead.id} className="px-6 py-4 hover:bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
@@ -187,10 +208,10 @@ export default function Dashboard() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Pending Drafts</h2>
-            <a href="/inbox" className="text-sm text-blue-600 hover:text-blue-800">View all →</a>
+            <a href="/inbox" className="text-sm text-blue-600 hover:text-blue-800">View all &rarr;</a>
           </div>
           <div className="divide-y divide-gray-200">
-            {pendingDrafts?.data?.slice(0, 5).map((draft) => (
+            {pendingDraftsList.slice(0, 5).map((draft) => (
               <div key={draft.id} className="px-6 py-4 hover:bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
@@ -212,14 +233,14 @@ export default function Dashboard() {
                   <div className="mt-2 flex flex-wrap gap-1">
                     {draft.flags.slice(0, 2).map((flag) => (
                       <span key={flag} className="px-2 py-0.5 bg-yellow-50 text-yellow-700 text-xs rounded">
-                        ⚠️ {flag.replace(/_/g, ' ')}
+                        {flag.replace(/_/g, ' ')}
                       </span>
                     ))}
                   </div>
                 )}
               </div>
             ))}
-            {(!pendingDrafts?.data || pendingDrafts.data.length === 0) && (
+            {pendingDraftsList.length === 0 && (
               <div className="px-6 py-8 text-center text-gray-500">
                 No pending drafts
               </div>
@@ -268,5 +289,5 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,4 +1,16 @@
-import { useState } from 'react'
+import { useState, ChangeEvent, Dispatch, SetStateAction } from 'react';
+import type { Draft } from '../../types/api';
+
+interface DraftResponseSectionProps {
+  draft: Draft;
+  isEditMode: boolean;
+  editedSubject: string;
+  setEditedSubject: Dispatch<SetStateAction<string>>;
+  editedContent: string;
+  setEditedContent: Dispatch<SetStateAction<string>>;
+  editSummary: string;
+  setEditSummary: Dispatch<SetStateAction<string>>;
+}
 
 export default function DraftResponseSection({
   draft,
@@ -9,8 +21,8 @@ export default function DraftResponseSection({
   setEditedContent,
   editSummary,
   setEditSummary,
-}) {
-  const [showRagSources, setShowRagSources] = useState(false)
+}: DraftResponseSectionProps): JSX.Element {
+  const [showRagSources, setShowRagSources] = useState(false);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -40,7 +52,7 @@ export default function DraftResponseSection({
             <input
               type="text"
               value={editedSubject}
-              onChange={(e) => setEditedSubject(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setEditedSubject(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium"
               placeholder="Email subject..."
             />
@@ -59,7 +71,7 @@ export default function DraftResponseSection({
           {isEditMode ? (
             <textarea
               value={editedContent}
-              onChange={(e) => setEditedContent(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setEditedContent(e.target.value)}
               rows={20}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-none"
               placeholder="Email content..."
@@ -79,7 +91,7 @@ export default function DraftResponseSection({
             </label>
             <textarea
               value={editSummary}
-              onChange={(e) => setEditSummary(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setEditSummary(e.target.value)}
               rows={2}
               className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-sm"
               placeholder="Describe what you changed and why (e.g., 'Fixed typo in pricing section' or 'Made tone more professional')..."
@@ -136,7 +148,7 @@ export default function DraftResponseSection({
                 <h4 className="text-sm font-semibold text-yellow-900 mb-1">Flags & Warnings</h4>
                 <ul className="text-sm text-yellow-800 space-y-1">
                   {draft.flags.map((flag, idx) => (
-                    <li key={idx}>• {flag.replace(/_/g, ' ')}</li>
+                    <li key={idx}>- {flag.replace(/_/g, ' ')}</li>
                   ))}
                 </ul>
               </div>
@@ -145,5 +157,5 @@ export default function DraftResponseSection({
         )}
       </div>
     </div>
-  )
+  );
 }

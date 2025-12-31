@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { analyticsAPI, leadsAPI } from '../services/api'
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { TrendingUp, Users, Mail, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
+import { useState, ReactNode, ChangeEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { analyticsAPI, leadsAPI } from '../services/api';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { TrendingUp, Users, Mail, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import type { Lead } from '../types/api';
 
-const COLORS = {
+const COLORS: Record<string, string> = {
   critical: '#dc2626',
   high: '#ea580c',
   medium: '#f59e0b',
@@ -12,71 +13,121 @@ const COLORS = {
   primary: '#3b82f6',
   success: '#10b981',
   warning: '#f59e0b',
+};
+
+interface PriorityDataItem {
+  name: string;
+  value: number;
+  color: string;
 }
 
-export default function Analytics() {
-  const [timeRange, setTimeRange] = useState(7)
+interface QualityDistributionItem {
+  range: string;
+  count: number;
+}
+
+interface TimelineDataItem {
+  date: string;
+  count: number;
+}
+
+interface ProductTypeItem {
+  name: string;
+  value: number;
+}
+
+interface RecentActivity {
+  id: number;
+  email: string;
+  score: number;
+  timestamp: string;
+}
+
+interface AnalyticsOverviewData {
+  total_leads?: number;
+  spam_leads?: number;
+  avg_quality_score?: number;
+  approval_rate?: number;
+  pending_drafts?: number;
+  leads_by_priority?: Record<string, number>;
+  recent_activity?: RecentActivity[];
+}
+
+interface MetricCardProps {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: ReactNode;
+  color?: 'blue' | 'green' | 'purple' | 'orange' | 'red';
+}
+
+interface ChartCardProps {
+  title: string;
+  children: ReactNode;
+}
+
+export default function Analytics(): JSX.Element {
+  const [timeRange, setTimeRange] = useState(7);
 
   // Fetch analytics overview
-  const { data: overview, isLoading: overviewLoading } = useQuery({
+  const { data: overview } = useQuery({
     queryKey: ['analytics', 'overview', timeRange],
     queryFn: () => analyticsAPI.getOverview({ days: timeRange }),
-  })
+  });
 
-  // Fetch product trends
-  const { data: trends, isLoading: trendsLoading } = useQuery({
+  // Fetch product trends (reserved for future chart expansions)
+  const { data: _trends } = useQuery({
     queryKey: ['analytics', 'product-trends', timeRange],
     queryFn: () => analyticsAPI.getProductTrends({ days: timeRange }),
-  })
+  });
 
   // Fetch product type distribution from backend
-  const { data: productTypesData, isLoading: productTypesLoading } = useQuery({
+  const { data: productTypesData } = useQuery({
     queryKey: ['analytics', 'product-types', timeRange],
-    queryFn: () => analyticsAPI.getProductTypes({ days: timeRange, limit: 10 }),
-  })
+    queryFn: () => analyticsAPI.getProductTypes({ days: timeRange }),
+  });
 
   // Fetch all leads for additional metrics (quality distribution, timeline)
   const { data: allLeads } = useQuery({
     queryKey: ['leads', 'all'],
     queryFn: () => leadsAPI.getAll({ limit: 1000 }),
-  })
+  });
 
-  const analytics = overview?.data || {}
-  const productTrends = trends?.data?.trends || []
-  const productTypeData = productTypesData?.data?.product_types || []
-  const allLeadsData = allLeads?.data || []
+  const analytics = (overview?.data || {}) as AnalyticsOverviewData;
+  const productTypeData = ((productTypesData?.data as { product_types?: ProductTypeItem[] })?.product_types || []) as ProductTypeItem[];
+  const allLeadsData = ((allLeads?.data || []) as Lead[]);
 
   // Filter out spam leads from frontend calculations
-  const leads = allLeadsData.filter(lead => lead.lead_status !== 'spam')
+  const leads = allLeadsData.filter(lead => lead.lead_status !== 'spam');
 
   // Calculate priority distribution
-  const priorityData = [
+  const priorityData: PriorityDataItem[] = [
     { name: 'Critical', value: analytics.leads_by_priority?.critical || 0, color: COLORS.critical },
     { name: 'High', value: analytics.leads_by_priority?.high || 0, color: COLORS.high },
     { name: 'Medium', value: analytics.leads_by_priority?.medium || 0, color: COLORS.medium },
     { name: 'Low', value: analytics.leads_by_priority?.low || 0, color: COLORS.low },
-  ].filter(item => item.value > 0)
+  ].filter(item => item.value > 0);
 
   // Calculate quality score distribution
-  const qualityDistribution = [
-    { range: '9-10 (Excellent)', count: leads.filter(l => l.lead_quality_score >= 9).length },
-    { range: '7-8 (Good)', count: leads.filter(l => l.lead_quality_score >= 7 && l.lead_quality_score < 9).length },
-    { range: '5-6 (Medium)', count: leads.filter(l => l.lead_quality_score >= 5 && l.lead_quality_score < 7).length },
-    { range: '1-4 (Low)', count: leads.filter(l => l.lead_quality_score >= 1 && l.lead_quality_score < 5).length },
-  ]
+  const qualityDistribution: QualityDistributionItem[] = [
+    { range: '9-10 (Excellent)', count: leads.filter(l => (l.lead_quality_score ?? 0) >= 9).length },
+    { range: '7-8 (Good)', count: leads.filter(l => (l.lead_quality_score ?? 0) >= 7 && (l.lead_quality_score ?? 0) < 9).length },
+    { range: '5-6 (Medium)', count: leads.filter(l => (l.lead_quality_score ?? 0) >= 5 && (l.lead_quality_score ?? 0) < 7).length },
+    { range: '1-4 (Low)', count: leads.filter(l => (l.lead_quality_score ?? 0) >= 1 && (l.lead_quality_score ?? 0) < 5).length },
+  ];
 
   // Calculate leads over time (daily)
-  const leadsOverTime = {}
+  const leadsOverTime: Record<string, number> = {};
   leads.forEach(lead => {
     if (lead.received_at) {
-      const date = new Date(lead.received_at).toISOString().split('T')[0]
-      leadsOverTime[date] = (leadsOverTime[date] || 0) + 1
+      const date = new Date(lead.received_at).toISOString().split('T')[0];
+      leadsOverTime[date] = (leadsOverTime[date] || 0) + 1;
     }
-  })
-  const timelineData = Object.entries(leadsOverTime)
+  });
+  const timelineData: TimelineDataItem[] = Object.entries(leadsOverTime)
     .map(([date, count]) => ({ date, count }))
     .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-30) // Last 30 days
+    .slice(-30); // Last 30 days
 
   return (
     <div className="space-y-6">
@@ -92,7 +143,7 @@ export default function Analytics() {
           <label className="text-sm font-medium text-gray-700">Time Range:</label>
           <select
             value={timeRange}
-            onChange={(e) => setTimeRange(Number(e.target.value))}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setTimeRange(Number(e.target.value))}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value={7}>Last 7 days</option>
@@ -258,7 +309,7 @@ export default function Analytics() {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{activity.email}</p>
                   <p className="text-xs text-gray-500">
-                    Lead #{activity.id} • Quality: {activity.score}/10
+                    Lead #{activity.id} - Quality: {activity.score}/10
                   </p>
                 </div>
                 <div className="text-xs text-gray-500">
@@ -274,17 +325,17 @@ export default function Analytics() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function MetricCard({ title, value, subtitle, icon, color = 'blue' }) {
-  const colorClasses = {
+function MetricCard({ title, value, subtitle, icon, color = 'blue' }: MetricCardProps): JSX.Element {
+  const colorClasses: Record<string, string> = {
     blue: 'from-blue-500 to-blue-600',
     green: 'from-green-500 to-green-600',
     purple: 'from-purple-500 to-purple-600',
     orange: 'from-orange-500 to-orange-600',
     red: 'from-red-500 to-red-600',
-  }
+  };
 
   return (
     <div className={`bg-gradient-to-br ${colorClasses[color]} rounded-lg shadow-lg p-6 text-white`}>
@@ -301,14 +352,14 @@ function MetricCard({ title, value, subtitle, icon, color = 'blue' }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function ChartCard({ title, children }) {
+function ChartCard({ title, children }: ChartCardProps): JSX.Element {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
       {children}
     </div>
-  )
+  );
 }

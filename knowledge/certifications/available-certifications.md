@@ -15,7 +15,7 @@ Our facility maintains multiple certifications to meet diverse market requiremen
 - **Audit Frequency**: Annual + random inspections
 - **What It Means**: Ensures consistent quality, safety, and efficacy
 - **Cost to Customer**: Included in base pricing
-- **Documentation**: GMP Certificate provided with each batch
+- **Documentation**: GMP Certificate provided when requested
 
 ### NSF International Certification
 **Status**: Active

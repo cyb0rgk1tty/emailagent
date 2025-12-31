@@ -1,6 +1,18 @@
-import { useState } from 'react'
-import DraftListItem from './DraftListItem'
-import { emailsAPI } from '../../services/api'
+import { useState, ChangeEvent } from 'react';
+import DraftListItem from './DraftListItem';
+import { emailsAPI } from '../../services/api';
+import type { Draft, DraftStats } from '../../types/api';
+
+interface DraftListSidebarProps {
+  drafts: Draft[];
+  stats: DraftStats | null;
+  isLoading: boolean;
+  error: Error | null;
+  selectedDraftId: number | null;
+  onSelectDraft: (id: number) => void;
+  statusFilter: string;
+  onFilterChange: (filter: string) => void;
+}
 
 export default function DraftListSidebar({
   drafts,
@@ -11,43 +23,43 @@ export default function DraftListSidebar({
   onSelectDraft,
   statusFilter,
   onFilterChange,
-}) {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [refreshMessage, setRefreshMessage] = useState('')
+}: DraftListSidebarProps): JSX.Element {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState('');
 
   // Handle manual email refresh
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    setRefreshMessage('')
+  const handleRefresh = async (): Promise<void> => {
+    setIsRefreshing(true);
+    setRefreshMessage('');
     try {
-      await emailsAPI.triggerCheck()
-      setRefreshMessage('Checking for new emails...')
-      setTimeout(() => setRefreshMessage(''), 3000)
-    } catch (error) {
-      setRefreshMessage('Failed to trigger email check')
-      setTimeout(() => setRefreshMessage(''), 3000)
+      await emailsAPI.triggerCheck();
+      setRefreshMessage('Checking for new emails...');
+      setTimeout(() => setRefreshMessage(''), 3000);
+    } catch {
+      setRefreshMessage('Failed to trigger email check');
+      setTimeout(() => setRefreshMessage(''), 3000);
     } finally {
-      setTimeout(() => setIsRefreshing(false), 1000)
+      setTimeout(() => setIsRefreshing(false), 1000);
     }
-  }
+  };
 
   // Filter drafts by search query
   const filteredDrafts = drafts.filter((draft) => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
     return (
       draft.subject_line?.toLowerCase().includes(query) ||
       draft.lead?.sender_name?.toLowerCase().includes(query) ||
       draft.lead?.sender_email?.toLowerCase().includes(query) ||
       draft.lead?.product_type?.some(p => p.toLowerCase().includes(query))
-    )
-  })
+    );
+  });
 
   // Get counts from stats (independent of current filter) - defaults to 0 if stats not loaded
-  const pendingCount = stats?.pending_drafts || 0
-  const approvedCount = stats?.approved_drafts || 0
-  const rejectedCount = stats?.rejected_drafts || 0
+  const pendingCount = stats?.pending_drafts || 0;
+  const approvedCount = stats?.approved_drafts || 0;
+  const rejectedCount = stats?.rejected_drafts || 0;
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
@@ -105,7 +117,7 @@ export default function DraftListSidebar({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
             placeholder="Search drafts..."
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           />
@@ -234,12 +246,12 @@ export default function DraftListSidebar({
       <div className="p-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-600">
         <div className="flex items-center justify-center gap-2">
           <span>Shortcuts:</span>
-          <kbd className="px-1.5 py-0.5 bg-white rounded border border-gray-300">↑↓</kbd>
+          <kbd className="px-1.5 py-0.5 bg-white rounded border border-gray-300">Up/Down</kbd>
           <kbd className="px-1.5 py-0.5 bg-white rounded border border-gray-300">Enter</kbd>
           <kbd className="px-1.5 py-0.5 bg-white rounded border border-gray-300">E</kbd>
           <kbd className="px-1.5 py-0.5 bg-white rounded border border-gray-300">/</kbd>
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { draftsAPI, emailsAPI } from '../services/api'
-import DraftListSidebar from '../components/inbox/DraftListSidebar'
-import DraftDetailView from '../components/inbox/DraftDetailView'
-import EmptyState from '../components/inbox/EmptyState'
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { draftsAPI, emailsAPI } from '../services/api';
+import DraftListSidebar from '../components/inbox/DraftListSidebar';
+import DraftDetailView from '../components/inbox/DraftDetailView';
+import EmptyState from '../components/inbox/EmptyState';
+import type { Draft } from '../types/api';
 
-export default function Inbox() {
-  const queryClient = useQueryClient()
-  const [selectedDraftId, setSelectedDraftId] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('pending')
-  const [showSidebar, setShowSidebar] = useState(true) // For mobile
+export default function Inbox(): JSX.Element {
+  const [selectedDraftId, setSelectedDraftId] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState('pending');
+  const [showSidebar, setShowSidebar] = useState(true); // For mobile
 
   // Fetch drafts based on filter
   const { data: drafts, isLoading, error } = useQuery({
@@ -18,131 +18,134 @@ export default function Inbox() {
       ? draftsAPI.getPending(100)
       : draftsAPI.getAll({ status: statusFilter === 'all' ? undefined : statusFilter, limit: 100 }),
     refetchInterval: 30000, // Auto-refresh every 30 seconds
-  })
+  });
 
   // Fetch draft stats (independent of filter)
   const { data: stats } = useQuery({
     queryKey: ['draft-stats'],
     queryFn: () => draftsAPI.getCount(),
     refetchInterval: 30000, // Auto-refresh every 30 seconds
-  })
+  });
 
   // Trigger email check on page mount/refresh
   useEffect(() => {
-    const triggerEmailCheck = async () => {
+    const triggerEmailCheck = async (): Promise<void> => {
       try {
-        await emailsAPI.triggerCheck()
+        await emailsAPI.triggerCheck();
         // Silent success - no UI feedback needed
-      } catch (error) {
+      } catch (err) {
         // Silent failure - don't disrupt user experience
-        console.debug('Email check trigger failed (non-critical):', error)
+        console.debug('Email check trigger failed (non-critical):', err);
       }
-    }
+    };
 
-    triggerEmailCheck()
-  }, []) // Empty dependency array = run once on mount
+    triggerEmailCheck();
+  }, []); // Empty dependency array = run once on mount
 
-  const draftsList = Array.isArray(drafts?.data) ? drafts.data : (Array.isArray(drafts) ? drafts : [])
+  const draftsList: Draft[] = Array.isArray(drafts?.data) ? drafts.data : (Array.isArray(drafts) ? drafts : []);
 
   // Get selected draft
-  const selectedDraft = draftsList.find(d => d.id === selectedDraftId)
+  const selectedDraft = draftsList.find(d => d.id === selectedDraftId);
 
   // Auto-select first draft when list changes
   useEffect(() => {
     if (draftsList.length > 0 && !selectedDraftId) {
-      setSelectedDraftId(draftsList[0].id)
+      setSelectedDraftId(draftsList[0].id);
     }
     // If selected draft is no longer in the list, select first available
     if (selectedDraftId && !draftsList.find(d => d.id === selectedDraftId)) {
-      setSelectedDraftId(draftsList.length > 0 ? draftsList[0].id : null)
+      setSelectedDraftId(draftsList.length > 0 ? draftsList[0].id : null);
     }
-  }, [draftsList, selectedDraftId])
+  }, [draftsList, selectedDraftId]);
 
   // Handle draft selection
-  const handleSelectDraft = (draftId) => {
-    setSelectedDraftId(draftId)
+  const handleSelectDraft = (draftId: number): void => {
+    setSelectedDraftId(draftId);
     // Hide sidebar on mobile after selection
     if (window.innerWidth < 1024) {
-      setShowSidebar(false)
+      setShowSidebar(false);
     }
-  }
+  };
 
   // Handle filter change
-  const handleFilterChange = (newFilter) => {
-    setStatusFilter(newFilter)
-    setSelectedDraftId(null) // Clear selection when changing filters
-  }
+  const handleFilterChange = (newFilter: string): void => {
+    setStatusFilter(newFilter);
+    setSelectedDraftId(null); // Clear selection when changing filters
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent): void => {
+      const target = e.target as HTMLElement;
       // Don't trigger shortcuts if user is typing in an input
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         // Allow / to focus search even when in an input (unless it's the search input itself)
-        if (e.key === '/' && e.target.placeholder !== 'Search drafts...') {
-          e.preventDefault()
-          document.querySelector('input[placeholder="Search drafts..."]')?.focus()
+        if (e.key === '/' && (target as HTMLInputElement).placeholder !== 'Search drafts...') {
+          e.preventDefault();
+          const searchInput = document.querySelector<HTMLInputElement>('input[placeholder="Search drafts..."]');
+          searchInput?.focus();
         }
-        return
+        return;
       }
 
       // Focus search with /
       if (e.key === '/') {
-        e.preventDefault()
-        document.querySelector('input[placeholder="Search drafts..."]')?.focus()
-        return
+        e.preventDefault();
+        const searchInput = document.querySelector<HTMLInputElement>('input[placeholder="Search drafts..."]');
+        searchInput?.focus();
+        return;
       }
 
       // Navigation shortcuts only work when a draft is selected
-      if (!selectedDraftId) return
+      if (!selectedDraftId) return;
 
-      const currentIndex = draftsList.findIndex(d => d.id === selectedDraftId)
+      const currentIndex = draftsList.findIndex(d => d.id === selectedDraftId);
 
       switch (e.key) {
         case 'ArrowUp':
-          e.preventDefault()
+          e.preventDefault();
           if (currentIndex > 0) {
-            setSelectedDraftId(draftsList[currentIndex - 1].id)
+            setSelectedDraftId(draftsList[currentIndex - 1].id);
           }
-          break
+          break;
         case 'ArrowDown':
-          e.preventDefault()
+          e.preventDefault();
           if (currentIndex < draftsList.length - 1) {
-            setSelectedDraftId(draftsList[currentIndex + 1].id)
+            setSelectedDraftId(draftsList[currentIndex + 1].id);
           }
-          break
+          break;
         case 'Enter':
-          e.preventDefault()
+          e.preventDefault();
           if (selectedDraft?.status === 'pending') {
             // Trigger approve action
-            const approveButton = document.querySelector('button:has(svg) + button:has(svg):last-of-type')
-            approveButton?.click()
+            const approveButton = document.querySelector<HTMLButtonElement>('button:has(svg) + button:has(svg):last-of-type');
+            approveButton?.click();
           }
-          break
+          break;
         case 'e':
         case 'E':
-          e.preventDefault()
+          e.preventDefault();
           if (selectedDraft?.status === 'pending') {
             // Trigger edit action
-            const editButton = document.querySelector('button:has(svg):first-of-type')
-            editButton?.click()
+            const editButton = document.querySelector<HTMLButtonElement>('button:has(svg):first-of-type');
+            editButton?.click();
           }
-          break
+          break;
         case 'Delete':
         case 'Backspace':
-          e.preventDefault()
+          e.preventDefault();
           if (selectedDraft?.status === 'pending') {
             // Trigger reject action
-            const rejectButton = document.querySelector('button:has(svg) + button:has(svg)')
-            rejectButton?.click()
+            const rejectButton = document.querySelector<HTMLButtonElement>('button:has(svg) + button:has(svg)');
+            rejectButton?.click();
           }
-          break
+          break;
       }
-    }
+    };
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedDraftId, draftsList, selectedDraft])
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedDraftId, draftsList, selectedDraft]);
 
   return (
     <div className="-mx-6 lg:-mx-8 -my-6 flex h-[calc(100vh-4rem)] overflow-hidden">
@@ -165,7 +168,7 @@ export default function Inbox() {
       `}>
         <DraftListSidebar
           drafts={draftsList}
-          stats={stats?.data || stats}
+          stats={stats?.data ?? null}
           isLoading={isLoading}
           error={error}
           selectedDraftId={selectedDraftId}
@@ -187,5 +190,5 @@ export default function Inbox() {
         )}
       </div>
     </div>
-  )
+  );
 }

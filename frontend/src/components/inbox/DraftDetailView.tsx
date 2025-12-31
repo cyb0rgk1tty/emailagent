@@ -1,28 +1,38 @@
-import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { draftsAPI } from '../../services/api'
-import ExtractedLeadDataSection from './ExtractedLeadDataSection'
-import OriginalInquirySection from './OriginalInquirySection'
-import DraftResponseSection from './DraftResponseSection'
-import ConfirmModal from '../ConfirmModal'
-import toast from 'react-hot-toast'
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { draftsAPI } from '../../services/api';
+import ExtractedLeadDataSection from './ExtractedLeadDataSection';
+import OriginalInquirySection from './OriginalInquirySection';
+import DraftResponseSection from './DraftResponseSection';
+import ConfirmModal from '../ConfirmModal';
+import toast from 'react-hot-toast';
+import type { Draft, DraftApproval, DraftStatus } from '../../types/api';
 
-export default function DraftDetailView({ draft }) {
-  const queryClient = useQueryClient()
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [editedSubject, setEditedSubject] = useState(draft.subject_line)
-  const [editedContent, setEditedContent] = useState(draft.draft_content)
-  const [editSummary, setEditSummary] = useState('')
-  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null })
+interface ConfirmModalState {
+  isOpen: boolean;
+  type: 'approve' | 'reject' | 'skip' | 'discard' | null;
+}
+
+interface DraftDetailViewProps {
+  draft: Draft;
+}
+
+export default function DraftDetailView({ draft }: DraftDetailViewProps): JSX.Element {
+  const queryClient = useQueryClient();
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedSubject, setEditedSubject] = useState(draft.subject_line);
+  const [editedContent, setEditedContent] = useState(draft.draft_content);
+  const [editSummary, setEditSummary] = useState('');
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({ isOpen: false, type: null });
 
   // Approve/Reject mutation
   const approveMutation = useMutation({
-    mutationFn: (data) => draftsAPI.approve(draft.id, data),
+    mutationFn: (data: DraftApproval) => draftsAPI.approve(draft.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(['drafts'])
-      setIsEditMode(false)
+      queryClient.invalidateQueries({ queryKey: ['drafts'] });
+      setIsEditMode(false);
     },
-  })
+  });
 
   // Save edits mutation
   const saveEditsMutation = useMutation({
@@ -34,93 +44,93 @@ export default function DraftDetailView({ draft }) {
       reviewed_by: 'user',
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['drafts'])
-      setIsEditMode(false)
-      setEditSummary('')
+      queryClient.invalidateQueries({ queryKey: ['drafts'] });
+      setIsEditMode(false);
+      setEditSummary('');
     },
-  })
+  });
 
-  const handleApprove = () => {
-    setConfirmModal({ isOpen: true, type: 'approve' })
-  }
+  const handleApprove = (): void => {
+    setConfirmModal({ isOpen: true, type: 'approve' });
+  };
 
-  const handleReject = () => {
-    setConfirmModal({ isOpen: true, type: 'reject' })
-  }
+  const handleReject = (): void => {
+    setConfirmModal({ isOpen: true, type: 'reject' });
+  };
 
-  const handleSkip = () => {
-    setConfirmModal({ isOpen: true, type: 'skip' })
-  }
+  const handleSkip = (): void => {
+    setConfirmModal({ isOpen: true, type: 'skip' });
+  };
 
-  const handleConfirmApprove = () => {
-    approveMutation.mutate({ action: 'approve', reviewed_by: 'user' })
-    setConfirmModal({ isOpen: false, type: null })
-  }
+  const handleConfirmApprove = (): void => {
+    approveMutation.mutate({ action: 'approve', reviewed_by: 'user' });
+    setConfirmModal({ isOpen: false, type: null });
+  };
 
-  const handleConfirmReject = () => {
-    approveMutation.mutate({ action: 'reject', reviewed_by: 'user' })
-    setConfirmModal({ isOpen: false, type: null })
-  }
+  const handleConfirmReject = (): void => {
+    approveMutation.mutate({ action: 'reject', reviewed_by: 'user' });
+    setConfirmModal({ isOpen: false, type: null });
+  };
 
-  const handleConfirmSkip = () => {
-    approveMutation.mutate({ action: 'skip', reviewed_by: 'user' })
-    setConfirmModal({ isOpen: false, type: null })
-  }
+  const handleConfirmSkip = (): void => {
+    approveMutation.mutate({ action: 'skip', reviewed_by: 'user' });
+    setConfirmModal({ isOpen: false, type: null });
+  };
 
-  const handleConfirmDiscard = () => {
-    setIsEditMode(false)
-    setEditedSubject(draft.subject_line)
-    setEditedContent(draft.draft_content)
-    setEditSummary('')
-    setConfirmModal({ isOpen: false, type: null })
-  }
+  const handleConfirmDiscard = (): void => {
+    setIsEditMode(false);
+    setEditedSubject(draft.subject_line);
+    setEditedContent(draft.draft_content);
+    setEditSummary('');
+    setConfirmModal({ isOpen: false, type: null });
+  };
 
-  const handleEdit = () => {
+  const handleEdit = (): void => {
     if (isEditMode) {
       // Cancel edit mode
       if (editedSubject !== draft.subject_line || editedContent !== draft.draft_content) {
-        setConfirmModal({ isOpen: true, type: 'discard' })
-        return
+        setConfirmModal({ isOpen: true, type: 'discard' });
+        return;
       }
-      setIsEditMode(false)
-      setEditedSubject(draft.subject_line)
-      setEditedContent(draft.draft_content)
-      setEditSummary('')
+      setIsEditMode(false);
+      setEditedSubject(draft.subject_line);
+      setEditedContent(draft.draft_content);
+      setEditSummary('');
     } else {
       // Enter edit mode
-      setIsEditMode(true)
+      setIsEditMode(true);
     }
-  }
+  };
 
-  const handleSaveEdits = () => {
+  const handleSaveEdits = (): void => {
     if (!editSummary.trim()) {
-      toast.error('Please provide a summary of your edits')
-      return
+      toast.error('Please provide a summary of your edits');
+      return;
     }
-    saveEditsMutation.mutate()
-  }
+    saveEditsMutation.mutate();
+  };
 
-  const getPriorityColor = (priority) => {
-    const colors = {
+  const getPriorityColor = (priority: string): string => {
+    const colors: Record<string, string> = {
       critical: 'bg-red-100 text-red-800 border-red-300',
       high: 'bg-orange-100 text-orange-800 border-orange-300',
       medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
       low: 'bg-gray-100 text-gray-800 border-gray-300',
-    }
-    return colors[priority] || colors.medium
-  }
+    };
+    return colors[priority] || colors.medium;
+  };
 
-  const getStatusColor = (status) => {
-    const colors = {
+  const getStatusColor = (status: DraftStatus | string): string => {
+    const colors: Record<string, string> = {
       pending: 'bg-blue-100 text-blue-800',
       approved: 'bg-green-100 text-green-800',
       rejected: 'bg-red-100 text-red-800',
       sent: 'bg-purple-100 text-purple-800',
       skipped: 'bg-gray-100 text-gray-800',
       edited: 'bg-yellow-100 text-yellow-800',
-    }
-    return colors[status] || colors.pending
-  }
+    };
+    return colors[status] || colors.pending;
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -319,5 +329,5 @@ export default function DraftDetailView({ draft }) {
         variant="warning"
       />
     </div>
-  )
+  );
 }

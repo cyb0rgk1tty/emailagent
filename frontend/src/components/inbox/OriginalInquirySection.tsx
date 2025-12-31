@@ -1,7 +1,12 @@
-import { useState } from 'react'
+import { useState } from 'react';
+import type { Lead } from '../../types/api';
 
-export default function OriginalInquirySection({ lead }) {
-  const [isExpanded, setIsExpanded] = useState(true)
+interface OriginalInquirySectionProps {
+  lead?: Lead;
+}
+
+export default function OriginalInquirySection({ lead }: OriginalInquirySectionProps): JSX.Element {
+  const [isExpanded, setIsExpanded] = useState(true);
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
@@ -69,5 +74,5 @@ export default function OriginalInquirySection({ lead }) {
         </div>
       )}
     </div>
-  )
+  );
 }

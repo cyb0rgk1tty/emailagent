@@ -1,39 +1,47 @@
-export default function DraftListItem({ draft, isSelected, onClick }) {
-  const getStatusColor = (status) => {
-    const colors = {
+import type { Draft, DraftStatus } from '../../types/api';
+
+interface DraftListItemProps {
+  draft: Draft;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+export default function DraftListItem({ draft, isSelected, onClick }: DraftListItemProps): JSX.Element {
+  const getStatusColor = (status: DraftStatus | string): string => {
+    const colors: Record<string, string> = {
       pending: 'bg-blue-500',
       approved: 'bg-green-500',
       rejected: 'bg-red-500',
       sent: 'bg-purple-500',
       edited: 'bg-yellow-500',
-    }
-    return colors[status] || colors.pending
-  }
+    };
+    return colors[status] || colors.pending;
+  };
 
-  const getPriorityColor = (priority) => {
-    const colors = {
+  const getPriorityColor = (priority: string): string => {
+    const colors: Record<string, string> = {
       critical: 'bg-red-100 text-red-700 border-red-300',
       high: 'bg-orange-100 text-orange-700 border-orange-300',
       medium: 'bg-yellow-100 text-yellow-700 border-yellow-300',
       low: 'bg-gray-100 text-gray-700 border-gray-300',
-    }
-    return colors[priority] || colors.medium
-  }
+    };
+    return colors[priority] || colors.medium;
+  };
 
-  const getRelativeTime = (dateString) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diff = now - date
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
+  const getRelativeTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
 
-    if (minutes < 1) return 'Just now'
-    if (minutes < 60) return `${minutes}m ago`
-    if (hours < 24) return `${hours}h ago`
-    if (days < 7) return `${days}d ago`
-    return date.toLocaleDateString()
-  }
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
 
   return (
     <div
@@ -90,17 +98,17 @@ export default function DraftListItem({ draft, isSelected, onClick }) {
             {product}
           </span>
         ))}
-        {draft.lead?.product_type?.length > 2 && (
+        {draft.lead?.product_type && draft.lead.product_type.length > 2 && (
           <span className="text-xs text-gray-500">
             +{draft.lead.product_type.length - 2}
           </span>
         )}
         {draft.flags && draft.flags.length > 0 && (
           <span className="text-xs text-yellow-600" title={draft.flags.join(', ')}>
-            ⚠️
+            !
           </span>
         )}
       </div>
     </div>
-  )
+  );
 }

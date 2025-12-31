@@ -1,28 +1,40 @@
-import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { draftsAPI } from '../services/api'
-import ConfirmModal from './ConfirmModal'
-import toast from 'react-hot-toast'
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { draftsAPI } from '../services/api';
+import ConfirmModal from './ConfirmModal';
+import toast from 'react-hot-toast';
+import type { Draft, DraftApproval } from '../types/api';
 
-export default function DraftReviewModal({ draft, onClose, onUpdate }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editedSubject, setEditedSubject] = useState(draft.subject_line)
-  const [editedContent, setEditedContent] = useState(draft.draft_content)
-  const [editSummary, setEditSummary] = useState('')
-  const [showFeedback, setShowFeedback] = useState(false)
-  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null })
+interface ConfirmModalState {
+  isOpen: boolean;
+  type: 'approve' | 'reject' | null;
+}
+
+interface DraftReviewModalProps {
+  draft: Draft;
+  onClose: () => void;
+  onUpdate: () => void;
+}
+
+export default function DraftReviewModal({ draft, onClose, onUpdate }: DraftReviewModalProps): JSX.Element {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedSubject, setEditedSubject] = useState(draft.subject_line);
+  const [editedContent, setEditedContent] = useState(draft.draft_content);
+  const [editSummary, setEditSummary] = useState('');
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({ isOpen: false, type: null });
 
   // Approve mutation
   const approveMutation = useMutation({
-    mutationFn: (data) => draftsAPI.approve(draft.id, data),
+    mutationFn: (data: DraftApproval) => draftsAPI.approve(draft.id, data),
     onSuccess: () => {
-      onUpdate()
+      onUpdate();
     },
-  })
+  });
 
   // Save edits mutation
   const saveEditsMutation = useMutation({
-    mutationFn: (data) => draftsAPI.approve(draft.id, {
+    mutationFn: () => draftsAPI.approve(draft.id, {
       action: 'save',
       edited_subject: editedSubject,
       edited_content: editedContent,
@@ -30,44 +42,44 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
       reviewed_by: 'user',
     }),
     onSuccess: () => {
-      setIsEditing(false)
-      onUpdate()
+      setIsEditing(false);
+      onUpdate();
     },
-  })
+  });
 
-  const handleApprove = () => {
-    setConfirmModal({ isOpen: true, type: 'approve' })
-  }
+  const handleApprove = (): void => {
+    setConfirmModal({ isOpen: true, type: 'approve' });
+  };
 
-  const handleReject = () => {
-    setConfirmModal({ isOpen: true, type: 'reject' })
-  }
+  const handleReject = (): void => {
+    setConfirmModal({ isOpen: true, type: 'reject' });
+  };
 
-  const handleConfirmApprove = () => {
-    approveMutation.mutate({ action: 'approve', reviewed_by: 'user' })
-    setConfirmModal({ isOpen: false, type: null })
-  }
+  const handleConfirmApprove = (): void => {
+    approveMutation.mutate({ action: 'approve', reviewed_by: 'user' });
+    setConfirmModal({ isOpen: false, type: null });
+  };
 
-  const handleConfirmReject = () => {
-    approveMutation.mutate({ action: 'reject', reviewed_by: 'user' })
-    setConfirmModal({ isOpen: false, type: null })
-  }
+  const handleConfirmReject = (): void => {
+    approveMutation.mutate({ action: 'reject', reviewed_by: 'user' });
+    setConfirmModal({ isOpen: false, type: null });
+  };
 
-  const handleSaveEdits = () => {
+  const handleSaveEdits = (): void => {
     if (!editSummary.trim()) {
-      toast.error('Please provide a summary of your edits')
-      return
+      toast.error('Please provide a summary of your edits');
+      return;
     }
-    saveEditsMutation.mutate()
-  }
+    saveEditsMutation.mutate();
+  };
 
-  const handleSendWithFeedback = (sentiment) => {
+  const handleSendWithFeedback = (sentiment: string): void => {
     approveMutation.mutate({
       action: 'approve',
-      customer_sentiment: sentiment,
+      feedback: sentiment,
       reviewed_by: 'user',
-    })
-  }
+    });
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -195,10 +207,10 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
               {/* Flags */}
               {draft.flags && draft.flags.length > 0 && (
                 <div className="bg-yellow-50 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-yellow-900 mb-2">⚠️ Flags:</h4>
+                  <h4 className="text-sm font-semibold text-yellow-900 mb-2">Flags:</h4>
                   <ul className="text-sm text-yellow-800 space-y-1">
                     {draft.flags.map((flag, idx) => (
-                      <li key={idx}>• {flag.replace(/_/g, ' ')}</li>
+                      <li key={idx}>- {flag.replace(/_/g, ' ')}</li>
                     ))}
                   </ul>
                 </div>
@@ -214,7 +226,7 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
                     onClick={() => setIsEditing(true)}
                     className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                   >
-                    ✎ Edit Draft
+                    Edit Draft
                   </button>
                 )}
               </div>
@@ -283,10 +295,10 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
                 <>
                   <button
                     onClick={() => {
-                      setIsEditing(false)
-                      setEditedSubject(draft.subject_line)
-                      setEditedContent(draft.draft_content)
-                      setEditSummary('')
+                      setIsEditing(false);
+                      setEditedSubject(draft.subject_line);
+                      setEditedContent(draft.draft_content);
+                      setEditSummary('');
                     }}
                     className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                   >
@@ -307,14 +319,14 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
                     disabled={approveMutation.isPending}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                   >
-                    ✗ Reject
+                    Reject
                   </button>
                   <button
                     onClick={handleApprove}
                     disabled={approveMutation.isPending}
                     className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold"
                   >
-                    {approveMutation.isPending ? 'Sending...' : '✓ Approve & Send'}
+                    {approveMutation.isPending ? 'Sending...' : 'Approve & Send'}
                   </button>
                 </>
               )}
@@ -340,19 +352,19 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
                 onClick={() => handleSendWithFeedback('positive')}
                 className="flex-1 px-4 py-3 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 border border-green-300"
               >
-                😊 Positive - Engaged/Interested
+                Positive - Engaged/Interested
               </button>
               <button
                 onClick={() => handleSendWithFeedback('neutral')}
                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 border border-gray-300"
               >
-                😐 Neutral - No Response
+                Neutral - No Response
               </button>
               <button
                 onClick={() => handleSendWithFeedback('negative')}
                 className="flex-1 px-4 py-3 bg-red-100 text-red-800 rounded-lg hover:bg-red-200 border border-red-300"
               >
-                😞 Negative - Not Interested
+                Negative - Not Interested
               </button>
             </div>
           </div>
@@ -384,5 +396,5 @@ export default function DraftReviewModal({ draft, onClose, onUpdate }) {
         loading={approveMutation.isPending}
       />
     </div>
-  )
+  );
 }

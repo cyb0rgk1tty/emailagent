@@ -1,4 +1,4 @@
-export default function EmptyState() {
+export default function EmptyState(): JSX.Element {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-4 py-12">
       <svg
@@ -26,12 +26,21 @@ export default function EmptyState() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md text-left">
         <h4 className="font-semibold text-blue-900 mb-2">Quick Tips:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Use <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">↑</kbd> <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">↓</kbd> to navigate</li>
-          <li>• Press <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">Enter</kbd> to approve</li>
-          <li>• Press <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">E</kbd> to edit</li>
-          <li>• Press <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">/</kbd> to search</li>
+          <li>
+            Use <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">Up</kbd>{' '}
+            <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">Down</kbd> to navigate
+          </li>
+          <li>
+            Press <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">Enter</kbd> to approve
+          </li>
+          <li>
+            Press <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">E</kbd> to edit
+          </li>
+          <li>
+            Press <kbd className="px-1.5 py-0.5 bg-white rounded text-xs border">/</kbd> to search
+          </li>
         </ul>
       </div>
     </div>
-  )
+  );
 }

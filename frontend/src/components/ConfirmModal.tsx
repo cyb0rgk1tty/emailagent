@@ -1,18 +1,28 @@
-import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Info, XCircle, LucideIcon } from 'lucide-react';
+import { MouseEvent } from 'react';
 
-/**
- * Beautiful confirmation modal with variants
- * @param {Object} props
- * @param {boolean} props.isOpen - Whether the modal is open
- * @param {Function} props.onClose - Callback when modal is closed/cancelled
- * @param {Function} props.onConfirm - Callback when user confirms
- * @param {string} props.title - Modal title
- * @param {string} props.message - Confirmation message
- * @param {string} props.confirmText - Text for confirm button (default: "Confirm")
- * @param {string} props.cancelText - Text for cancel button (default: "Cancel")
- * @param {string} props.variant - Modal variant: 'danger', 'warning', 'success', 'info' (default: 'info')
- * @param {boolean} props.loading - Whether the confirm action is loading
- */
+type ModalVariant = 'danger' | 'warning' | 'success' | 'info';
+
+interface VariantConfig {
+  icon: LucideIcon;
+  iconBg: string;
+  iconColor: string;
+  buttonBg: string;
+  borderColor: string;
+}
+
+interface ConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: ModalVariant;
+  loading?: boolean;
+}
+
 export default function ConfirmModal({
   isOpen,
   onClose,
@@ -23,10 +33,10 @@ export default function ConfirmModal({
   cancelText = 'Cancel',
   variant = 'info',
   loading = false,
-}) {
-  if (!isOpen) return null
+}: ConfirmModalProps): JSX.Element | null {
+  if (!isOpen) return null;
 
-  const variants = {
+  const variants: Record<ModalVariant, VariantConfig> = {
     danger: {
       icon: XCircle,
       iconBg: 'bg-red-100',
@@ -55,20 +65,20 @@ export default function ConfirmModal({
       buttonBg: 'bg-blue-600 hover:bg-blue-700',
       borderColor: 'border-blue-200',
     },
-  }
+  };
 
-  const config = variants[variant] || variants.info
-  const Icon = config.icon
+  const config = variants[variant] || variants.info;
+  const Icon = config.icon;
 
-  const handleConfirm = () => {
-    onConfirm()
-  }
+  const handleConfirm = (): void => {
+    onConfirm();
+  };
 
-  const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e: MouseEvent<HTMLDivElement>): void => {
     if (e.target === e.currentTarget) {
-      onClose()
+      onClose();
     }
-  }
+  };
 
   return (
     <div
@@ -120,5 +130,5 @@ export default function ConfirmModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
